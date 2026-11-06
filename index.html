@@ -362,9 +362,14 @@ footer.note{color:var(--dim);font-size:11px;text-align:center;line-height:1.6;ma
     <label class="fl">ပုံ ဖော်ပြချက် (Prompt)</label>
     <textarea class="inp" id="aiPrompt" placeholder="ဇာတ်လမ်းနှင့် ကိုက်ညီသော မျက်နှာဖုံးပုံ ဖော်ပြချက်"></textarea>
     <div class="err-text" id="aiPromptErr">Prompt ထည့်ရန် လိုပါတယ် — ဘယ်လို ပုံ လိုချင်သလဲ ရေးပါ (သို့) ခေါင်းစဉ် အရင် ထည့်ပါ။</div>
+    <label class="fl">ပုံ ရယူမည့် နည်းလမ်း</label>
+    <div class="chips" id="aiSrcChips">
+      <button class="chip on" data-src="free">🆓 Free (Key မလို)</button>
+      <button class="chip" data-src="gemini">✦ Gemini (ကိုယ်ပိုင် Key)</button>
+    </div>
     <div style="height:14px"></div>
     <button class="btn primary wide" id="btnGenAiCover">✦ ပုံ ဖန်တီးမယ်</button>
-    <p style="font-size:11.5px;color:var(--mut);line-height:1.6;margin:9px 0 0">ကိုယ်ပိုင် Gemini Key ဖြင့် Google သို့ တိုက်ရိုက် ချိတ်ဆက်သည်။ Key မရှိသေးလျှင် Settings မှာ ထည့်ပါ။</p>
+    <p style="font-size:11.5px;color:var(--mut);line-height:1.6;margin:9px 0 0">🆓 Free နည်းလမ်းမှာ Key မလိုပါ။ Gemini နည်းလမ်းမှာတော့ ပုံ (image) quota ရှိသော ကိုယ်ပိုင် Key လိုပါတယ် — Gemini အခမဲ့ Key များတွင် ပုံ quota 0 ဖြစ်နေတတ်သည်။</p>
   </div>
 </div>
 
@@ -573,32 +578,76 @@ $('fileCover').addEventListener('change',async e=>{const f=e.target.files[0];e.t
   showDone('✅ မျက်နှာဖုံး ရပါပြီ','Preview မှာ တွေ့ရပါပြီ')});
 $('btnPickCover').addEventListener('click',()=>$('fileCover').click());
 
-/* ============ AI cover (visitor's own Gemini key) ============ */
+/* ============ AI cover: Free (Pollinations, no key) or Gemini (own key) ============ */
 $('btnAiCover').addEventListener('click',()=>{const p=$('aiPrompt');
   if(!p.value.trim()){const t=[state.title1,state.title2].filter(Boolean).join(' ');
     p.value=t?('Audiobook cover art for a Burmese story titled "'+t+'"'+(state.author?(' by '+state.author):'')+'. Rich painterly illustration, no text in the image.'):'';
   }
   $('aiPromptErr').classList.remove('show');p.classList.remove('bad');openSheet('sheetAiCover')});
+document.querySelectorAll('#aiSrcChips .chip').forEach(ch=>ch.addEventListener('click',()=>{
+  document.querySelectorAll('#aiSrcChips .chip').forEach(x=>x.classList.remove('on'));ch.classList.add('on')}));
+function aiCoverSource(){const on=document.querySelector('#aiSrcChips .chip.on');return on?on.dataset.src:'free'}
+function pollinationsUrl(prompt){return 'https://image.pollinations.ai/prompt/'+encodeURIComponent(prompt)+
+  '?width=1024&height=1024&nologo=true&seed='+Math.floor(Math.random()*1000000000)}
+function imgUrlToBlob(url){return new Promise((res,rej)=>{const img=new Image();img.crossOrigin='anonymous';
+  img.onload=()=>{try{const c=document.createElement('canvas');c.width=img.naturalWidth||1024;c.height=img.naturalHeight||1024;
+    c.getContext('2d').drawImage(img,0,0);
+    if(c.toBlob)c.toBlob(b=>{if(b)res(b);else rej(new Error('img-blob-failed'))},'image/png');
+    else rej(new Error('img-blob-unsupported'))}catch(e){rej(e)}};
+  img.onerror=()=>rej(new Error('img-load-failed'));
+  img.src=url})}
+let aiCoverAbort=null;
+async function fetchAiCoverFree(prompt){
+  const url=pollinationsUrl(prompt);
+  try{
+    const res=await fetch(url,aiCoverAbort?{signal:aiCoverAbort.signal}:{});
+    if(!res.ok)throw new Error('Free service status '+res.status);
+    const blob=await res.blob();
+    if(!blob||blob.size<1000||!(blob.type||'').startsWith('image/'))throw new Error('Free service returned no image');
+    return blob;
+  }catch(e){
+    if(aiCoverAbort&&aiCoverAbort.signal.aborted)throw cancelErr();
+    const blob=await imgUrlToBlob(url);
+    if(aiCoverAbort&&aiCoverAbort.signal.aborted)throw cancelErr();
+    return blob;
+  }
+}
 $('btnGenAiCover').addEventListener('click',async()=>{
-  const key=(localStorage.getItem(LS_K)||'').trim();const p=$('aiPrompt');
+  const p=$('aiPrompt');
   if(!p.value.trim()){p.classList.add('bad');$('aiPromptErr').classList.add('show');p.focus();return}
   p.classList.remove('bad');$('aiPromptErr').classList.remove('show');
-  if(!key){closeSheets();openSheet('sheetSettings');const k=$('setGeminiKey');k.classList.add('bad');$('setGeminiKeyErr').classList.add('show');
-    showNotice('Gemini API Key လိုပါတယ် — Settings မှာ အရင် ထည့်ပါ','err');return}
-  const blob=await opBusy('AI မျက်နှာဖုံး ဖန်တီးနေပါတယ်…',async()=>{
-    const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent',
-      {method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},
-       body:JSON.stringify({contents:[{parts:[{text:p.value}]}],generationConfig:{responseModalities:['TEXT','IMAGE']}})});
-    const data=await res.json().catch(()=>({}));
-    if(!res.ok)throw new Error((data.error&&data.error.message)||('Google error '+res.status));
-    const parts=(((data.candidates||[])[0]||{}).content||{}).parts||[];
-    const ip=parts.find(x=>x.inlineData&&x.inlineData.data);
-    if(!ip)throw new Error('ပုံ ပြန်မရပါ — Prompt ပြောင်းပြီး ထပ်ကြိုးစားပါ');
-    const bin=atob(ip.inlineData.data);const arr=new Uint8Array(bin.length);
-    for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
-    return new Blob([arr],{type:ip.inlineData.mimeType||'image/png'})});
-  if(blob){await idb.put('cover:'+state.id,blob);state.aiCover=true;setCoverImg(blob,'ai');
-    closeSheets();showDone('✅ AI မျက်နှာဖုံး ရပါပြီ','မျက်နှာဖုံးကို AI ဖြင့် ဖန်တီးပြီးပါပြီ')}});
+  if(aiCoverSource()==='gemini'){
+    const key=(localStorage.getItem(LS_K)||'').trim();
+    if(!key){closeSheets();openSheet('sheetSettings');const k=$('setGeminiKey');k.classList.add('bad');$('setGeminiKeyErr').classList.add('show');
+      showNotice('Gemini API Key လိုပါတယ် — Settings မှာ အရင် ထည့်ပါ','err');return}
+    const blob=await opBusy('AI မျက်နှာဖုံး ဖန်တီးနေပါတယ်…',async()=>{
+      const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent',
+        {method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},
+         body:JSON.stringify({contents:[{parts:[{text:p.value}]}],generationConfig:{responseModalities:['TEXT','IMAGE']}})});
+      const data=await res.json().catch(()=>({}));
+      if(!res.ok)throw new Error((data.error&&data.error.message)||('Google error '+res.status));
+      const parts=(((data.candidates||[])[0]||{}).content||{}).parts||[];
+      const ip=parts.find(x=>x.inlineData&&x.inlineData.data);
+      if(!ip)throw new Error('ပုံ ပြန်မရပါ — Prompt ပြောင်းပြီး ထပ်ကြိုးစားပါ');
+      const bin=atob(ip.inlineData.data);const arr=new Uint8Array(bin.length);
+      for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
+      return new Blob([arr],{type:ip.inlineData.mimeType||'image/png'})});
+    if(blob){await idb.put('cover:'+state.id,blob);state.aiCover=true;setCoverImg(blob,'ai');
+      closeSheets();showDone('✅ AI မျက်နှာဖုံး ရပါပြီ','မျက်နှာဖုံးကို AI ဖြင့် ဖန်တီးပြီးပါပြီ')}
+    return}
+  /* Free route — Pollinations, no key needed */
+  aiCoverAbort=('AbortController' in window)?new AbortController():null;
+  loadCancelFn=()=>{if(aiCoverAbort)aiCoverAbort.abort()};
+  showLoad('AI မျက်နှာဖုံး ဖန်တီးနေပါတယ်…','🆓 Free service ဖြင့် ပုံ တောင်းခံနေပါတယ်…');
+  $('btnCancelExport').classList.remove('hidden');
+  let blob=null,err=null,cancelled=false;
+  try{blob=await fetchAiCoverFree(p.value.trim())}
+  catch(e){if(e&&e.cancelled)cancelled=true;else err=e}
+  loadCancelFn=null;aiCoverAbort=null;hideLoad();
+  if(cancelled){showNotice('⛔ ရပ်လိုက်ပြီ — မျက်နှာဖုံး မဖန်တီးပါ','ok');return}
+  if(err||!blob){showNotice('မအောင်မြင်ပါ — Free ပုံ service အလုပ်များ နေပါတယ် — ခဏနေ ထပ်ကြိုးစားပါ (သို့) Gemini နည်းလမ်း + billing ဖွင့်ထားသော Key ဖြင့် ကြိုးစားပါ','err');return}
+  await idb.put('cover:'+state.id,blob);state.aiCover=true;setCoverImg(blob,'ai');
+  closeSheets();showDone('✅ AI မျက်နှာဖုံး ရပါပြီ','မျက်နှာဖုံးကို AI ဖြင့် ဖန်တီးပြီးပါပြီ (🆓 Free)')});
 
 /* ============ backgrounds: animated themes ============ */
 const THEMES=[
