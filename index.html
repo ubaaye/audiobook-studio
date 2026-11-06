@@ -220,6 +220,7 @@ footer.note{color:var(--dim);font-size:11px;text-align:center;line-height:1.6;ma
     <h2>ကိရိယာ</h2>
     <div class="rowbtns">
       <button class="btn wide" data-open-sheet="sheetShrink">📉 ဖိုင် ချုံ့မယ်</button>
+      <button class="btn wide" data-open-sheet="sheetConvert">🌐 ဘာသာပြန် (အသံ → မြန်မာ)</button>
     </div>
     <p style="font-size:12px;color:var(--mut);line-height:1.6;margin:9px 0 0">အသံဖိုင်ကြီးများကို Telegram bot ဆီ ပို့နိုင်အောင် 20 MB အောက် ချုံ့ပေးသော ကိရိယာ</p>
   </section>
@@ -227,10 +228,11 @@ footer.note{color:var(--dim);font-size:11px;text-align:center;line-height:1.6;ma
   <footer class="note">အရာအားလုံး Browser ထဲတွင်သာ လုပ်ဆောင်သည် · အခမဲ့ · Project များ ဤဖုန်း/ Browser ထဲတွင် သိမ်းထားသည်</footer>
 </div>
 
-<input type="file" id="fileAudio" accept="audio/*" class="hidden">
+<input type="file" id="fileAudio" accept="audio/*,video/*,.mp3,.mp4,.m4a,.wav,.ogg,.webm,.flac,.aac" class="hidden">
 <input type="file" id="fileCover" accept="image/*" class="hidden">
 <input type="file" id="fileBgVideo" accept="video/*" class="hidden">
-<input type="file" id="fileShrink" accept="audio/*" class="hidden">
+<input type="file" id="fileShrink" accept="audio/*,video/*,.mp3,.mp4,.m4a,.wav,.ogg,.webm,.flac,.aac" class="hidden">
+<input type="file" id="fileCv" accept="audio/*,video/*,.mp3,.mp4,.m4a,.wav,.ogg,.webm,.flac,.aac" class="hidden">
 <audio id="audioEl" preload="metadata" class="hidden"></audio>
 <video id="bgVideoEl" loop muted playsinline class="hidden"></video>
 
@@ -341,10 +343,38 @@ footer.note{color:var(--dim);font-size:11px;text-align:center;line-height:1.6;ma
   <div class="grab"></div>
   <div class="shead"><h3>⚙ Settings</h3><button class="xbtn" data-close-sheet>✕</button></div>
   <div class="sbody">
-    <label class="fl">Gemini API Key (AI မျက်နှာဖုံး နှင့် အသံ ထုတ်ရန်)</label>
+    <div id="acctBox">
+      <label class="fl">အကောင့် (Edge အသံ အခမဲ့ သုံးရန် Login)</label>
+      <div id="acctOut">
+        <input class="inp" id="acctEmail" type="email" placeholder="အီးမေးလ်" autocomplete="email">
+        <div style="height:8px"></div>
+        <input class="inp" id="acctPass" type="password" placeholder="စကားဝှက်" autocomplete="current-password">
+        <div class="err-text" id="acctErr"></div>
+        <div class="rowbtns" style="margin-top:10px">
+          <button class="btn primary" id="btnLogin">ဝင်မယ်</button>
+          <button class="btn" id="btnSignup">အကောင့် ဖွင့်မယ်</button>
+        </div>
+        <p style="font-size:11.5px;color:var(--mut);line-height:1.6;margin:8px 0 0">Burmese Voice app မှာ သုံးသော အကောင့် အတိုင်း သုံးနိုင်သည်။ အကောင့် ဖွင့်ပြီးလျှင် Email ထဲက confirmation link ကို နှိပ်ရန် လိုနိုင်သည်။</p>
+      </div>
+      <div id="acctIn" class="hidden">
+        <div style="font-size:13.5px;line-height:1.6">✅ ဝင်ထားသည်: <b id="acctUserEmail"></b></div>
+        <div style="height:9px"></div>
+        <button class="btn wide" id="btnLogout">ထွက်မယ် (Logout)</button>
+      </div>
+      <div id="acctMsg" style="font-size:12.5px;line-height:1.55;margin-top:8px"></div>
+    </div>
+    <label class="fl">Gemini API Key 1 (AI မျက်နှာဖုံး နှင့် အသံ ထုတ်ရန်)</label>
     <input class="inp" id="setGeminiKey" type="password" placeholder="AIza…" autocomplete="off">
-    <div class="err-text" id="setGeminiKeyErr">AI မျက်နှာဖုံး သုံးရန် Gemini API Key လိုပါတယ် — Google AI Studio မှာ အခမဲ့ ရယူပြီး ဒီနေရာမှာ ထည့်ပါ။</div>
-    <p style="font-size:11.5px;color:var(--mut);line-height:1.6;margin:7px 0 0">Key ကို ဤ Browser ၏ localStorage ထဲတွင်သာ သိမ်းသည် — မည်သည့် server မှ မပို့ပါ။</p>
+    <div class="err-text" id="setGeminiKeyErr">Gemini API Key လိုပါတယ် — Google AI Studio မှာ အခမဲ့ ရယူပြီး ဒီနေရာမှာ ထည့်ပါ။</div>
+    <label class="fl">Gemini API Key 2 (မထည့်လည်း ရ)</label>
+    <input class="inp" id="setGeminiKey2" type="password" placeholder="AIza…" autocomplete="off">
+    <label class="fl">Gemini API Key 3 (မထည့်လည်း ရ)</label>
+    <input class="inp" id="setGeminiKey3" type="password" placeholder="AIza…" autocomplete="off">
+    <div id="geminiActiveLine" style="font-size:12px;color:var(--accent);margin-top:7px;line-height:1.5"></div>
+    <p style="font-size:11.5px;color:var(--mut);line-height:1.6;margin:7px 0 0">Gemini အခမဲ့ Key တစ်ခုလျှင် (Project တစ်ခုလျှင်) တစ်နေ့ ၁၀–၁၅ ကြိမ်ခန့်သာ ရသည် — Key များ ထည့်ထားလျှင် quota ပိုရပြီး၊ တစ်ခု 429 (quota ပြည့်) ဖြစ်လျှင် နောက် Key သို့ အလိုအလျောက် ပြောင်း သုံးမည်။ Key အားလုံးကို ဤ Browser ၏ localStorage ထဲတွင်သာ သိမ်းသည်။</p>
+    <label class="fl">Groq API Key (🌐 ဘာသာပြန် ကိရိယာ အတွက်)</label>
+    <input class="inp" id="setGroqKey" type="password" placeholder="gsk_…" autocomplete="off">
+    <div class="err-text" id="setGroqKeyErr">ဘာသာပြန် ကိရိယာ သုံးရန် Groq API Key လိုပါတယ် — console.groq.com မှာ အခမဲ့ ရယူပြီး ဒီနေရာမှာ ထည့်ပါ။</div>
     <div style="height:12px"></div>
     <button class="btn primary wide" id="btnSaveKey">Key သိမ်းမယ်</button>
     <label class="fl">Project ပြန်စရန်</label>
@@ -382,14 +412,25 @@ footer.note{color:var(--dim);font-size:11px;text-align:center;line-height:1.6;ma
     <textarea class="inp" id="ttsText" rows="7" placeholder="ပြောစေချင်သော စာသားကို ဒီမှာ ထည့်ပါ…"></textarea>
     <div style="font-size:12px;color:var(--mut);margin-top:5px"><span id="ttsCount">0</span> လုံး · စာရှည်လျှင် အပိုင်း ခွဲ၍ ထုတ်ပေးမည်</div>
     <div class="err-text" id="ttsTextErr">စာသား ထည့်ရန် လိုပါတယ် — ပြောစေချင်သော စာသား အရင် ရေးပါ။</div>
-    <label class="fl">အသံ (Voice)</label>
-    <button class="btn wide" id="btnTtsVoice" data-open-sheet="sheetTtsVoices">Kore · တည်ကြည်</button>
-    <label class="fl">Tone / Style (မထည့်လည်း ရ)</label>
-    <input class="inp" id="ttsStyle" placeholder="ဥပမာ — warm storytelling tone" autocomplete="off">
+    <label class="fl">Engine ရွေးမယ်</label>
+    <div class="chips" id="narrEngineChips">
+      <button class="chip on" data-eng="gemini">Gemini</button>
+      <button class="chip" data-eng="edge-thiha">Edge · Thiha</button>
+      <button class="chip" data-eng="edge-nilar">Edge · Nilar</button>
+    </div>
+    <div id="ttsVoiceRow">
+      <label class="fl">အသံ (Voice)</label>
+      <button class="btn wide" id="btnTtsVoice" data-open-sheet="sheetTtsVoices">Kore · တည်ကြည်</button>
+    </div>
+    <div id="ttsStyleRow">
+      <label class="fl">Tone / Style (မထည့်လည်း ရ)</label>
+      <input class="inp" id="ttsStyle" placeholder="ဥပမာ — warm storytelling tone" autocomplete="off">
+    </div>
+    <p id="edgeNote" class="hidden" style="font-size:12px;color:var(--mut);line-height:1.6;margin:10px 0 0">Edge အသံ = အခမဲ့ — နေ့စဉ် quota မရှိ။ သုံးရန် Login ဝင်ထားရန် လိုသည် (Settings ထိပ်ဆုံး အကောင့် အပိုင်း)။ အသံကို chip အတိုင်း သတ်မှတ်ပြီး ဖြစ်သည်။</p>
     <div style="height:14px"></div>
     <button class="btn primary wide" id="btnGenTts">🎙️ အသံ ထုတ်မယ်</button>
     <button class="btn wide hidden" id="btnDlTts" style="margin-top:9px">⬇ ထုတ်ထားသော အသံ (WAV) ဒေါင်းလုဒ်</button>
-    <p style="font-size:11.5px;color:var(--mut);line-height:1.6;margin:9px 0 0">ကိုယ်ပိုင် Gemini Key ဖြင့် Google သို့ တိုက်ရိုက် ချိတ်ဆက်သည်။ Gemini အခမဲ့ အဆင့်မှာ တစ်နေ့ ၁၀–၁၅ ကြိမ်ခန့်သာ ရသည် — စာသား ရှည်လျှင် အပိုင်း များများ ခွဲရသဖြင့် ကြိမ် အရေအတွက် ကုန်နိုင်သည်။ Key မရှိသေးလျှင် Settings မှာ ထည့်ပါ။</p>
+    <p style="font-size:11.5px;color:var(--mut);line-height:1.6;margin:9px 0 0">Gemini: ကိုယ်ပိုင် Key ဖြင့် Google သို့ တိုက်ရိုက် ချိတ်ဆက်သည်။ အခမဲ့ အဆင့်မှာ Key တစ်ခုလျှင် တစ်နေ့ ၁၀–၁၅ ကြိမ်ခန့်သာ ရသည် — Key များ ထည့်ထားလျှင် 429 ဖြစ်တိုင်း နောက် Key သို့ အလိုအလျောက် ပြောင်းမည်။ Edge: အခမဲ့၊ quota မရှိ၊ Login လိုသည်။</p>
   </div>
 </div>
 
@@ -407,6 +448,11 @@ footer.note{color:var(--dim);font-size:11px;text-align:center;line-height:1.6;ma
   <div class="sbody">
     <p style="font-size:12.5px;color:var(--mut);line-height:1.6;margin:2px 0 4px">Telegram bot ဆီ ပို့ရန် အသံဖိုင်ကို 20 MB အောက် ချုံ့ပေးသည် (bot က 20 MB ထက် ကြီးသော ဖိုင် ဒေါင်းလုဒ် မလုပ်နိုင်ပါ)။ အသံကို စကားပြော အတွက် လုံလောက်သော အဆင့် (mono · 24 kHz) ဖြင့် ထိန်းထားသည်။</p>
     <button class="btn wide" id="btnPickShrink">📁 ချုံ့မည့် အသံဖိုင် ရွေးမယ်</button>
+    <label class="fl">ထုတ်မည့် Format</label>
+    <div class="chips" id="shrinkFmtChips">
+      <button class="chip on" data-sfmt="mp3">MP3</button>
+      <button class="chip" data-sfmt="webm">WebM / Opus</button>
+    </div>
     <div style="height:10px"></div>
     <div id="shrinkMeta" style="font-size:13px;line-height:1.6">ဖိုင် မရွေးရသေးပါ</div>
     <div id="shrinkPlan" style="font-size:12.5px;color:var(--mut);line-height:1.6;margin-top:3px"></div>
@@ -417,6 +463,45 @@ footer.note{color:var(--dim);font-size:11px;text-align:center;line-height:1.6;ma
       <div class="rowbtns" style="margin-top:10px">
         <button class="btn primary" id="btnDlShrink">⬇ ဒေါင်းလုဒ်</button>
         <button class="btn" id="btnUseShrink">Project အသံ အဖြစ် သုံးမယ်</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Foreign audio → Burmese converter sheet -->
+<div class="sheet" id="sheetConvert" role="dialog" aria-label="Converter">
+  <div class="grab"></div>
+  <div class="shead"><h3>🌐 ဘာသာပြန် — နိုင်ငံခြား အသံ → မြန်မာ</h3><button class="xbtn" data-close-sheet>✕</button></div>
+  <div class="sbody">
+    <p style="font-size:12.5px;color:var(--mut);line-height:1.6;margin:2px 0 4px">နိုင်ငံခြား audiobook အသံကို စာသား ဖော် (Whisper) → မြန်မာ ဘာသာပြန် (AI) လုပ်ပေးသည်။ ရလာသော မြန်မာ စာသားကို စစ်ဆေး ပြင်ဆင်ပြီးမှ အသံ ထုတ်ရန် ပို့နိုင်သည် — အသံ အလိုအလျောက် မထုတ်ပါ။ Groq API Key လိုသည် (Settings မှာ ထည့်ပါ)။</p>
+    <label class="fl">အသံ အရင်းအမြစ်</label>
+    <div class="chips" id="cvSrcChips">
+      <button class="chip on" data-cvsrc="project">Project အသံ</button>
+      <button class="chip" data-cvsrc="file">ဖိုင် ရွေးမယ်</button>
+    </div>
+    <div id="cvFileRow" class="hidden">
+      <div style="height:10px"></div>
+      <button class="btn wide" id="btnPickCvFile">📁 ဘာသာပြန်မည့် အသံဖိုင် ရွေးမယ်</button>
+      <div id="cvFileMeta" style="font-size:12.5px;color:var(--mut);line-height:1.6;margin-top:6px">ဖိုင် မရွေးရသေးပါ</div>
+    </div>
+    <div class="err-text" id="cvSrcErr"></div>
+    <label class="fl">မူရင်း ဘာသာစကား</label>
+    <div class="chips" id="cvLangChips">
+      <button class="chip on" data-lang="">Auto</button>
+      <button class="chip" data-lang="en">English</button>
+      <button class="chip" data-lang="th">Thai</button>
+      <button class="chip" data-lang="zh">Chinese</button>
+    </div>
+    <div style="height:14px"></div>
+    <button class="btn primary wide" id="btnCvStart">🌐 စတင်မယ်</button>
+    <div id="cvResult" class="hidden">
+      <label class="fl">မြန်မာ ဘာသာပြန် (ပြင်လို့ ရသည်)</label>
+      <textarea class="inp" id="cvText" rows="9" placeholder="ဘာသာပြန် ရလဒ် ဒီမှာ ပေါ်မည်"></textarea>
+      <div style="font-size:12px;color:var(--mut);margin-top:5px"><span id="cvCount">0</span> လုံး</div>
+      <p style="font-size:11.5px;color:var(--mut);line-height:1.6;margin:7px 0 0">⚠️ AI ဘာသာပြန်မှာ အမှား ပါနိုင်သည် — အသံ မထုတ်မီ စာသားကို သေချာ စစ်ဆေးပါ။</p>
+      <div class="rowbtns" style="margin-top:10px">
+        <button class="btn primary" id="btnCvToNarr">🎙️ Narration သို့ ပို့</button>
+        <button class="btn" id="btnCvClear">🗑️ ရှင်းမယ်</button>
       </div>
     </div>
   </div>
@@ -448,6 +533,7 @@ footer.note{color:var(--dim);font-size:11px;text-align:center;line-height:1.6;ma
 </div></div>
 
 <div class="notice" id="notice"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 'use strict';
 /* ============ helpers ============ */
@@ -474,6 +560,55 @@ const idb={db:null,
 
 /* ============ state ============ */
 const LS_P='abs_projects',LS_C='abs_current',LS_K='abs_gemini_key';
+const LS_K3='abs_gemini_keys',LS_KA='abs_gemini_active_slot',LS_GROQ='abs_groq_key';
+/* ============ Gemini key store (up to 3 keys, rotation on quota) ============ */
+function geminiKeySlots(){let arr=null;
+  try{arr=JSON.parse(localStorage.getItem(LS_K3)||'null')}catch(e){arr=null}
+  if(!Array.isArray(arr)){const old=(localStorage.getItem(LS_K)||'').trim();
+    arr=old?[old,'','']:['','',''];
+    try{localStorage.setItem(LS_K3,JSON.stringify(arr))}catch(e){}}
+  while(arr.length<3)arr.push('');
+  return arr.slice(0,3).map(k=>String(k||''))}
+function geminiKeyList(){return geminiKeySlots().map((key,slot)=>({key:key.trim(),slot})).filter(x=>x.key)}
+function saveGeminiKeySlots(arr){arr=(arr||[]).slice(0,3);while(arr.length<3)arr.push('');
+  try{localStorage.setItem(LS_K3,JSON.stringify(arr));localStorage.setItem(LS_K,arr[0]||'')}catch(e){}}
+function geminiActiveSlot(){const n=parseInt(localStorage.getItem(LS_KA)||'0',10);return isNaN(n)?0:n}
+function setGeminiActiveSlot(n){try{localStorage.setItem(LS_KA,String(n))}catch(e){}
+  if(typeof renderGeminiActive==='function')renderGeminiActive()}
+function isQuotaErr(e){if(!e)return false;
+  if(e.status===429)return true;
+  const m=String(e.message||e);
+  return /RESOURCE_EXHAUSTED|quota|rate.?limit|429/i.test(m)}
+/* Run one Gemini request with key rotation: start at the last-succeeded
+   key; on a 429/quota error retry the SAME request on the next key; a
+   non-quota error is thrown at once; if all keys are quota-dead, the
+   LAST true error is thrown. fn receives the key string. */
+async function geminiCall(fn){const list=geminiKeyList();
+  if(!list.length){const e=new Error('Gemini API Key မရှိပါ');e.noKey=true;throw e}
+  const start=Math.max(0,list.findIndex(x=>x.slot===geminiActiveSlot()));
+  let lastErr=null;
+  for(let n=0;n<list.length;n++){const item=list[(start+n)%list.length];
+    try{const r=await fn(item.key);setGeminiActiveSlot(item.slot);return r}
+    catch(e){if(isQuotaErr(e)){lastErr=e;continue}throw e}}
+  throw lastErr||new Error('Gemini Key အားလုံး quota ပြည့်နေသည်')}
+/* ============ Supabase account (same project as the Burmese Voice app) ============ */
+const SUPABASE_URL='https://nfdkvungccscalshjmzo.supabase.co';
+const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5mZGt2dW5nY2NzY2Fsc2hqbXpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM4NTk3NjgsImV4cCI6MjEwOTQzNTc2OH0.ldWyHiPwsebTsjxgQsCarYtlTcBEEUcD4piJlQfdbIo';
+const PUBLIC_API='https://burmese-voice-tts-public.onrender.com';
+let sb=null,sbSession=null;
+try{if(window.supabase&&window.supabase.createClient)sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY)}catch(e){sb=null}
+function renderAccount(){const inp=!!(sbSession&&sbSession.user);
+  $('acctOut').classList.toggle('hidden',inp);$('acctIn').classList.toggle('hidden',!inp);
+  if(inp)$('acctUserEmail').textContent=sbSession.user.email||''}
+function setAcctMsg(m,ok){const el=$('acctMsg');el.textContent=m||'';el.style.color=m?(ok?'var(--ok)':'var(--err)'):''}
+async function edgeAccessToken(){if(sb){
+    try{const{data}=await sb.auth.getSession();
+      if(data&&data.session){sbSession=data.session;return data.session.access_token}}catch(e){}}
+  return sbSession&&sbSession.access_token?sbSession.access_token:''}
+async function initAuth(){if(!sb){renderAccount();return}
+  try{const{data}=await sb.auth.getSession();sbSession=data&&data.session?data.session:null}catch(e){sbSession=null}
+  renderAccount();
+  try{sb.auth.onAuthStateChange((ev,s)=>{sbSession=s;renderAccount()})}catch(e){}}
 function defaults(){return{id:'p'+Date.now().toString(36)+Math.floor(Math.random()*999),createdAt:Date.now(),updatedAt:Date.now(),
   title1:'',title2:'',subtitle:'',author:'',episode:'',
   titleSize:118,subSize:54,textColor:'#f4f6fa',cardColor:'rgba(10,12,16,0.55)',
@@ -617,21 +752,20 @@ $('btnGenAiCover').addEventListener('click',async()=>{
   if(!p.value.trim()){p.classList.add('bad');$('aiPromptErr').classList.add('show');p.focus();return}
   p.classList.remove('bad');$('aiPromptErr').classList.remove('show');
   if(aiCoverSource()==='gemini'){
-    const key=(localStorage.getItem(LS_K)||'').trim();
-    if(!key){closeSheets();openSheet('sheetSettings');const k=$('setGeminiKey');k.classList.add('bad');$('setGeminiKeyErr').classList.add('show');
+    if(!geminiKeyList().length){closeSheets();openSheet('sheetSettings');highlightGeminiKey();
       showNotice('Gemini API Key လိုပါတယ် — Settings မှာ အရင် ထည့်ပါ','err');return}
-    const blob=await opBusy('AI မျက်နှာဖုံး ဖန်တီးနေပါတယ်…',async()=>{
+    const blob=await opBusy('AI မျက်နှာဖုံး ဖန်တီးနေပါတယ်…',async()=>geminiCall(async key=>{
       const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent',
         {method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},
          body:JSON.stringify({contents:[{parts:[{text:p.value}]}],generationConfig:{responseModalities:['TEXT','IMAGE']}})});
       const data=await res.json().catch(()=>({}));
-      if(!res.ok)throw new Error((data.error&&data.error.message)||('Google error '+res.status));
+      if(!res.ok){const e=new Error((data.error&&data.error.message)||('Google error '+res.status));e.status=res.status;throw e}
       const parts=(((data.candidates||[])[0]||{}).content||{}).parts||[];
       const ip=parts.find(x=>x.inlineData&&x.inlineData.data);
       if(!ip)throw new Error('ပုံ ပြန်မရပါ — Prompt ပြောင်းပြီး ထပ်ကြိုးစားပါ');
       const bin=atob(ip.inlineData.data);const arr=new Uint8Array(bin.length);
       for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
-      return new Blob([arr],{type:ip.inlineData.mimeType||'image/png'})});
+      return new Blob([arr],{type:ip.inlineData.mimeType||'image/png'})}));
     if(blob){await idb.put('cover:'+state.id,blob);state.aiCover=true;setCoverImg(blob,'ai');
       closeSheets();showDone('✅ AI မျက်နှာဖုံး ရပါပြီ','မျက်နှာဖုံးကို AI ဖြင့် ဖန်တီးပြီးပါပြီ')}
     return}
@@ -1093,12 +1227,55 @@ async function loadBlobsForState(){
   drawWave()}
 
 /* ============ Settings ============ */
-function refreshSettings(){$('setGeminiKey').value=localStorage.getItem(LS_K)||'';
+function renderGeminiActive(){const el=$('geminiActiveLine');if(!el)return;
+  const list=geminiKeyList();
+  if(!list.length){el.textContent='Key မထည့်ရသေးပါ';return}
+  const act=list.find(x=>x.slot===geminiActiveSlot())||list[0];
+  el.textContent='Active: Key '+(act.slot+1)+' · Key '+list.length+' ခု ထည့်ထားသည် (429 ဖြစ်လျှင် အလိုအလျောက် လှည့်သုံးမည်)'}
+function refreshSettings(){const slots=geminiKeySlots();
+  $('setGeminiKey').value=slots[0]||'';$('setGeminiKey2').value=slots[1]||'';$('setGeminiKey3').value=slots[2]||'';
+  $('setGroqKey').value=localStorage.getItem(LS_GROQ)||'';
+  renderGeminiActive();renderAccount();
   $('storageMeta').textContent='Project စုစုပေါင်း: '+projects.length+' ခု · ဖိုင်များကို ဤ Browser ၏ IndexedDB တွင် သိမ်းထားသည်'}
-$('btnSaveKey').addEventListener('click',()=>{const v=$('setGeminiKey').value.trim();
-  if(v)localStorage.setItem(LS_K,v);else localStorage.removeItem(LS_K);
-  $('setGeminiKey').classList.remove('bad');$('setGeminiKeyErr').classList.remove('show');
-  showDone('✅ Key သိမ်းပြီးပါပြီ',v?'AI မျက်နှာဖုံး သုံးနိုင်ပါပြီ':'Key ဖယ်ပြီးပါပြီ')});
+function highlightGeminiKey(){const k=$('setGeminiKey');k.classList.add('bad');$('setGeminiKeyErr').classList.add('show');
+  try{k.scrollIntoView({block:'center'})}catch(e){}k.focus()}
+function highlightGroqKey(){const k=$('setGroqKey');k.classList.add('bad');$('setGroqKeyErr').classList.add('show');
+  try{k.scrollIntoView({block:'center'})}catch(e){}k.focus()}
+$('btnSaveKey').addEventListener('click',()=>{
+  saveGeminiKeySlots([$('setGeminiKey').value.trim(),$('setGeminiKey2').value.trim(),$('setGeminiKey3').value.trim()]);
+  const g=$('setGroqKey').value.trim();
+  if(g)localStorage.setItem(LS_GROQ,g);else localStorage.removeItem(LS_GROQ);
+  ['setGeminiKey','setGeminiKey2','setGeminiKey3','setGroqKey'].forEach(id=>$(id).classList.remove('bad'));
+  $('setGeminiKeyErr').classList.remove('show');$('setGroqKeyErr').classList.remove('show');
+  renderGeminiActive();
+  showDone('✅ Key သိမ်းပြီးပါပြီ','ထည့်ထားသော Key များကို သိမ်းပြီးပါပြီ')});
+/* ---- account: login / sign-up / logout (Supabase, same account as Voice app) ---- */
+function acctValidate(needPassLen){const em=$('acctEmail'),pw=$('acctPass');
+  const email=em.value.trim(),pass=pw.value;
+  $('acctErr').classList.remove('show');em.classList.remove('bad');pw.classList.remove('bad');
+  if(!email){em.classList.add('bad');$('acctErr').textContent='အီးမေးလ် ထည့်ရန် လိုပါတယ် — အီးမေးလ် အရင် ရေးပါ။';$('acctErr').classList.add('show');em.focus();return null}
+  if(!pass){pw.classList.add('bad');$('acctErr').textContent='စကားဝှက် ထည့်ရန် လိုပါတယ် — စကားဝှက် အရင် ရေးပါ။';$('acctErr').classList.add('show');pw.focus();return null}
+  if(needPassLen&&pass.length<6){pw.classList.add('bad');$('acctErr').textContent='စကားဝှက် အနည်းဆုံး ၆ လုံး ထားပေးပါ။';$('acctErr').classList.add('show');pw.focus();return null}
+  if(!sb){setAcctMsg('Supabase ချိတ်ဆက် မရပါ — အင်တာနက် စစ်ပြီး ပြန်ဖွင့်ပါ',false);return null}
+  return{email,password:pass}}
+$('btnLogin').addEventListener('click',async()=>{const v=acctValidate(false);if(!v)return;
+  setAcctMsg('ဝင်နေပါတယ်…',true);
+  try{const{data,error}=await sb.auth.signInWithPassword(v);
+    if(error){setAcctMsg('ဝင်မရပါ: '+error.message,false);return}
+    sbSession=data&&data.session?data.session:null;renderAccount();
+    setAcctMsg('✅ ဝင်ပြီးပါပြီ — Edge အသံ သုံးနိုင်ပါပြီ',true)}
+  catch(e){setAcctMsg('ဝင်မရပါ: '+(e&&e.message?e.message:e),false)}});
+$('btnSignup').addEventListener('click',async()=>{const v=acctValidate(true);if(!v)return;
+  setAcctMsg('အကောင့် ဖွင့်နေပါတယ်…',true);
+  try{const{data,error}=await sb.auth.signUp(v);
+    if(error){setAcctMsg('ဖွင့်မရပါ: '+error.message,false);return}
+    if(data&&data.session){sbSession=data.session;renderAccount();
+      setAcctMsg('✅ အကောင့် ဖွင့်ပြီး ဝင်ပြီးပါပြီ',true)}
+    else setAcctMsg('✅ အကောင့် ဖွင့်ပြီးပါပြီ — Email ထဲက confirmation link ကို နှိပ်ပြီးမှ ဝင်ပါ',true)}
+  catch(e){setAcctMsg('ဖွင့်မရပါ: '+(e&&e.message?e.message:e),false)}});
+$('btnLogout').addEventListener('click',async()=>{
+  try{if(sb)await sb.auth.signOut()}catch(e){}
+  sbSession=null;renderAccount();setAcctMsg('ထွက်ပြီးပါပြီ',true)});
 $('btnReset').addEventListener('click',async()=>{
   if(!await confirmUi('Reset လုပ်မလား?','လက်ရှိ Project ၏ စာသား၊ အသံ၊ မျက်နှာဖုံး၊ နောက်ခံ အားလုံး ရှင်းသွားပါမည်'))return;
   const id=state.id;await idb.del('audio:'+id);await idb.del('cover:'+id);await idb.del('bg:'+id);
@@ -1139,7 +1316,7 @@ async function geminiTtsChunk(key,text,voice){
      body:JSON.stringify({contents:[{parts:[{text}]}],generationConfig:{responseModalities:['AUDIO'],
        speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:voice}}}}})});
   const data=await res.json().catch(()=>({}));
-  if(!res.ok)throw new Error((data.error&&data.error.message)||('Google error '+res.status));
+  if(!res.ok){const e=new Error((data.error&&data.error.message)||('Google error '+res.status));e.status=res.status;throw e}
   const parts=(((data.candidates||[])[0]||{}).content||{}).parts||[];
   const ip=parts.find(x=>x.inlineData&&x.inlineData.data);
   if(!ip)throw new Error('အသံ ပြန်မရပါ — ထပ်ကြိုးစားပါ');
@@ -1154,12 +1331,75 @@ function pcmToWav(pcm,sampleRate){const n=pcm.length;const buf=new ArrayBuffer(4
   v.setUint32(28,sampleRate*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);
   ws(36,'data');v.setUint32(40,n,true);new Uint8Array(buf,44).set(pcm);
   return new Blob([buf],{type:'audio/wav'})}
+/* ---- narration engine chips: Gemini / Edge·Thiha / Edge·Nilar ---- */
+function narrEngine(){const on=document.querySelector('#narrEngineChips .chip.on');return on?on.dataset.eng:'gemini'}
+function applyEngineUI(){const eng=narrEngine();const edge=eng.indexOf('edge')===0;
+  $('ttsVoiceRow').classList.toggle('hidden',edge);$('ttsStyleRow').classList.toggle('hidden',edge);
+  $('edgeNote').classList.toggle('hidden',!edge)}
+document.querySelectorAll('#narrEngineChips .chip').forEach(ch=>ch.addEventListener('click',()=>{
+  document.querySelectorAll('#narrEngineChips .chip').forEach(x=>x.classList.remove('on'));ch.classList.add('on');applyEngineUI()}));
+async function finishNarration(wav){const nm=(fileBase()||'Narration')+'.wav';
+  await idb.put('audio:'+state.id,wav);await setAudioBlob(wav,nm);
+  if(lastTtsUrl)URL.revokeObjectURL(lastTtsUrl);lastTtsUrl=URL.createObjectURL(wav);
+  const dl=$('btnDlTts');dl.classList.remove('hidden');
+  dl.onclick=()=>{const a=document.createElement('a');a.href=lastTtsUrl;a.download=nm;a.click()};
+  closeSheets();showDone('✅ အသံ ရပါပြီ','Narration WAV ကို Project ၏ အသံအဖြစ် သတ်မှတ်ပြီးပါပြီ — Export ဖြင့် Video ဆက်ထုတ်နိုင်ပါတယ်')}
+/* Encode decoded AudioBuffers into one 16-bit PCM WAV (Edge stitching) */
+function buffersToWav(buffers){if(!buffers.length)throw new Error('အသံ အပိုင်း မရပါ');
+  const sr=buffers[0].sampleRate,nCh=Math.min(2,Math.max(1,buffers[0].numberOfChannels));
+  const total=buffers.reduce((a,b)=>a+b.length,0);
+  const chans=[];for(let c=0;c<nCh;c++){const d=new Float32Array(total);let o=0;
+    for(const b of buffers){d.set(b.getChannelData(Math.min(c,b.numberOfChannels-1)),o);o+=b.length}chans.push(d)}
+  const bytes=44+total*nCh*2;const buf=new ArrayBuffer(bytes);const v=new DataView(buf);
+  const ws=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i))};
+  ws(0,'RIFF');v.setUint32(4,bytes-8,true);ws(8,'WAVE');ws(12,'fmt ');v.setUint32(16,16,true);
+  v.setUint16(20,1,true);v.setUint16(22,nCh,true);v.setUint32(24,sr,true);
+  v.setUint32(28,sr*nCh*2,true);v.setUint16(32,nCh*2,true);v.setUint16(34,16,true);
+  ws(36,'data');v.setUint32(40,total*nCh*2,true);
+  let o=44;for(let i=0;i<total;i++)for(let c=0;c<nCh;c++){const s=Math.max(-1,Math.min(1,chans[c][i]));
+    v.setInt16(o,s<0?s*0x8000:s*0x7FFF,true);o+=2}
+  return new Blob([buf],{type:'audio/wav'})}
+async function genNarrationEdge(text,voiceId){
+  const token=await edgeAccessToken();
+  if(!token){closeSheets();openSheet('sheetSettings');
+    const box=$('acctBox');try{box.scrollIntoView({block:'start'})}catch(e){}
+    showNotice('Edge အသံ သုံးရန် Login လိုပါတယ် — Settings ထိပ်ဆုံး အကောင့် အပိုင်းမှာ ဝင်ပါ','err');return}
+  const chunks=splitTtsText(text,550);
+  const ctl=('AbortController' in window)?new AbortController():null;
+  ttsCancel=false;loadCancelFn=()=>{ttsCancel=true;if(ctl)ctl.abort()};
+  showLoad('🎙️ အသံ ထုတ်နေပါတယ်…','Edge အပိုင်း 1 / '+chunks.length);
+  $('btnCancelExport').classList.remove('hidden');
+  const blobs=[];let err=null,expired=false;
+  try{for(let i=0;i<chunks.length;i++){if(ttsCancel)break;
+      setLoadMsg('Edge အပိုင်း '+(i+1)+' / '+chunks.length);
+      const res=await fetch(PUBLIC_API+'/api/pub/synthesize',
+        {method:'POST',signal:ctl?ctl.signal:undefined,
+         headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+         body:JSON.stringify({text:chunks[i],voice:voiceId,rate:'+0%',pitch:'+0Hz'})});
+      if(res.status===401){expired=true;throw new Error('Login သက်တမ်း ကုန်သွားပါပြီ — Settings မှာ ပြန် ဝင်ပေးပါ')}
+      if(!res.ok){const d=await res.json().catch(()=>({}));
+        throw new Error(d.detail||d.message||('Server error '+res.status))}
+      blobs.push(await res.blob())}}
+  catch(e){if(ttsCancel||(e&&e.name==='AbortError'))err=null;else err=e}
+  loadCancelFn=null;hideLoad();
+  if(expired){sbSession=null;renderAccount();openSheet('sheetSettings')}
+  if(err){showNotice('မအောင်မြင်ပါ — '+(err&&err.message?err.message:err),'err');return}
+  if(ttsCancel||!blobs.length){showNotice('⛔ ရပ်လိုက်ပြီ — အသံ မထုတ်ပါ','ok');return}
+  showLoad('🎙️ အသံ ဆက်နေပါတယ်…','အပိုင်းများ တစ်ခုတည်း ဆက်နေသည်…');
+  try{const ACx=window.AudioContext||window.webkitAudioContext;if(!ACx)throw new Error('WebAudio မရပါ');
+    const dac=new ACx();const bufs=[];
+    for(const b of blobs)bufs.push(await dac.decodeAudioData(await b.arrayBuffer()));
+    if(dac.close)dac.close();
+    const wav=buffersToWav(bufs);hideLoad();await finishNarration(wav)}
+  catch(e){hideLoad();showNotice('အသံ ဆက် မရပါ — '+(e&&e.message?e.message:e),'err')}}
 $('btnGenTts').addEventListener('click',async()=>{
   const ta=$('ttsText');const text=ta.value.trim();
   if(!text){ta.classList.add('bad');$('ttsTextErr').classList.add('show');ta.focus();return}
   ta.classList.remove('bad');$('ttsTextErr').classList.remove('show');
-  const key=(localStorage.getItem(LS_K)||'').trim();
-  if(!key){closeSheets();openSheet('sheetSettings');const k=$('setGeminiKey');k.classList.add('bad');$('setGeminiKeyErr').classList.add('show');
+  const eng=narrEngine();
+  if(eng==='edge-thiha'){await genNarrationEdge(text,'my-MM-ThihaNeural');return}
+  if(eng==='edge-nilar'){await genNarrationEdge(text,'my-MM-NilarNeural');return}
+  if(!geminiKeyList().length){closeSheets();openSheet('sheetSettings');highlightGeminiKey();
     showNotice('Gemini API Key လိုပါတယ် — Settings မှာ အရင် ထည့်ပါ','err');return}
   const style=$('ttsStyle').value.trim();
   const chunks=splitTtsText(text,550);
@@ -1169,7 +1409,7 @@ $('btnGenTts').addEventListener('click',async()=>{
   const pcms=[];let sr=24000,err=null;
   try{for(let i=0;i<chunks.length;i++){if(ttsCancel)break;
       setLoadMsg('အပိုင်း '+(i+1)+' / '+chunks.length+' — အသံ: '+ttsVoice);
-      const r=await geminiTtsChunk(key,(style?('['+style+'] '):'')+chunks[i],ttsVoice);
+      const r=await geminiCall(k=>geminiTtsChunk(k,(style?('['+style+'] '):'')+chunks[i],ttsVoice));
       sr=r.rate;pcms.push(r.bytes);
       if(i<chunks.length-1)await new Promise(r2=>setTimeout(r2,200))}}
   catch(e){err=e}
@@ -1178,12 +1418,7 @@ $('btnGenTts').addEventListener('click',async()=>{
   if(ttsCancel||!pcms.length){showNotice('⛔ ရပ်လိုက်ပြီ — အသံ မထုတ်ပါ','ok');return}
   const total=pcms.reduce((a,b)=>a+b.length,0);const all=new Uint8Array(total);let off=0;
   pcms.forEach(b=>{all.set(b,off);off+=b.length});
-  const wav=pcmToWav(all,sr);const nm=(fileBase()||'Narration')+'.wav';
-  await idb.put('audio:'+state.id,wav);await setAudioBlob(wav,nm);
-  if(lastTtsUrl)URL.revokeObjectURL(lastTtsUrl);lastTtsUrl=URL.createObjectURL(wav);
-  const dl=$('btnDlTts');dl.classList.remove('hidden');
-  dl.onclick=()=>{const a=document.createElement('a');a.href=lastTtsUrl;a.download=nm;a.click()};
-  closeSheets();showDone('✅ အသံ ရပါပြီ','Narration WAV ကို Project ၏ အသံအဖြစ် သတ်မှတ်ပြီးပါပြီ — Export ဖြင့် Video ဆက်ထုတ်နိုင်ပါတယ်')});
+  await finishNarration(pcmToWav(all,sr))});
 
 /* ============ Audio shrinker — ≤19 MB, for sending to the Telegram bot ============ */
 const SHRINK_SR=24000;
@@ -1245,16 +1480,23 @@ async function loadLame(){if(lameLib)return lameLib;
   catch(e){await import('https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js');lameLib=window.lamejs}
   if(!lameLib||!lameLib.Mp3Encoder)throw new Error('lamejs မရပါ');
   return lameLib}
-async function encodeShrinkMp3(ch,kb){const L=await loadLame();
-  const enc=new L.Mp3Encoder(1,SHRINK_SR,kb);const parts=[];const BLK=1152;
+/* Generic mono MP3 encode from Float32 PCM (lamejs) — shared by the
+   shrinker and the converter's STT chunker. */
+async function encodeMp3Mono(ch,sr,kb,isCancel,onProg){const L=await loadLame();
+  const enc=new L.Mp3Encoder(1,sr,kb);const parts=[];const BLK=1152;
   for(let off=0;off<ch.length;off+=BLK){
-    if(shrinkCancel)throw cancelErr();
+    if(isCancel&&isCancel())throw cancelErr();
     const n=Math.min(BLK,ch.length-off);const i16=new Int16Array(n);
     for(let i=0;i<n;i++){const v=Math.max(-1,Math.min(1,ch[off+i]));i16[i]=v<0?v*0x8000:v*0x7FFF}
     const d=enc.encodeBuffer(i16);if(d&&d.length)parts.push(d);
-    if(off%(BLK*512)===0)setLoadMsg('Encode (MP3) — '+Math.round(off/ch.length*100)+'%')}
+    if(onProg&&off%(BLK*512)===0)onProg(off/ch.length)}
   const end=enc.flush();if(end&&end.length)parts.push(end);
   return new Blob(parts,{type:'audio/mpeg'})}
+async function encodeShrinkMp3(ch,kb){return encodeMp3Mono(ch,SHRINK_SR,kb,()=>shrinkCancel,
+  p=>setLoadMsg('Encode (MP3) — '+Math.round(p*100)+'%'))}
+document.querySelectorAll('#shrinkFmtChips .chip').forEach(ch=>ch.addEventListener('click',()=>{
+  document.querySelectorAll('#shrinkFmtChips .chip').forEach(x=>x.classList.remove('on'));ch.classList.add('on')}));
+function shrinkFormat(){const on=document.querySelector('#shrinkFmtChips .chip.on');return on?on.dataset.sfmt:'mp3'}
 $('btnDoShrink').addEventListener('click',async()=>{
   if(!shrinkFile){showNotice('ချုံ့မည့် အသံဖိုင် အရင် ရွေးပါ — "📁 ဖိုင် ရွေးမယ်" ကို နှိပ်ပါ','err');return}
   shrinkCancel=false;loadCancelFn=()=>{shrinkCancel=true};
@@ -1264,7 +1506,10 @@ $('btnDoShrink').addEventListener('click',async()=>{
   try{
     const ACx=window.AudioContext||window.webkitAudioContext;if(!ACx)throw new Error('WebAudio မရပါ');
     const dac=new ACx();
-    let buf;try{buf=await dac.decodeAudioData(await shrinkFile.arrayBuffer())}finally{if(dac.close)dac.close()}
+    let buf;
+    try{buf=await dac.decodeAudioData(await shrinkFile.arrayBuffer())}
+    catch(de){throw new Error('"'+shrinkFile.name+'" ဖိုင်ကို ဖတ်/ဖြည် မရပါ — MP3 (သို့) WAV ဖိုင် ပြောင်းသုံး ကြည့်ပါ')}
+    finally{if(dac.close)dac.close()}
     if(shrinkCancel)throw cancelErr();
     shrinkDur=buf.duration;refreshShrinkUI();
     const kb=pickShrinkBitrate(buf.duration);
@@ -1275,10 +1520,13 @@ $('btnDoShrink').addEventListener('click',async()=>{
     if(shrinkCancel)throw cancelErr();
     const ch=pcm.getChannelData(0);
     let out=null,ext='';
-    if('AudioEncoder' in window){
-      try{out=await encodeShrinkOpus(ch,kb);ext='webm'}catch(e){if(e&&e.cancelled)throw e;out=null}}
-    if(!out){try{out=await encodeShrinkMp3(ch,kb);ext='mp3'}
-      catch(e){if(e&&e.cancelled)throw e;throw new Error('Encoder မရပါ — Chrome နောက်ဆုံး version ဖြင့် ထပ်ကြိုးစားပါ')}}
+    const wantMp3=shrinkFormat()==='mp3';
+    const tryMp3=async()=>{const b=await encodeShrinkMp3(ch,kb);out=b;ext='mp3'};
+    const tryOpus=async()=>{if(!('AudioEncoder' in window))throw new Error('Opus encoder မရပါ');
+      const b=await encodeShrinkOpus(ch,kb);out=b;ext='webm'};
+    try{await (wantMp3?tryMp3():tryOpus())}catch(e){if(e&&e.cancelled)throw e;out=null}
+    if(!out){try{await (wantMp3?tryOpus():tryMp3())}catch(e){if(e&&e.cancelled)throw e;
+      throw new Error('Encoder မရပါ — Chrome နောက်ဆုံး version ဖြင့် ထပ်ကြိုးစားပါ')}}
     result={blob:out,ext,kb};
   }catch(e){err=e}
   loadCancelFn=null;hideLoad();
@@ -1298,6 +1546,124 @@ $('btnUseShrink').addEventListener('click',async()=>{if(!shrinkBlob)return;
   await opBusy('Project အသံ အဖြစ် သတ်မှတ်နေပါတယ်…',async()=>{await idb.put('audio:'+state.id,shrinkBlob);await setAudioBlob(shrinkBlob,nm)});
   closeSheets();showDone('✅ အသံ ရပါပြီ','ချုံ့ထားသော ဖိုင်ကို Project ၏ အသံ အဖြစ် သတ်မှတ်ပြီးပါပြီ')});
 
+/* ============ Converter: foreign audio → Burmese text (visitor's own Groq key) ============ */
+let cvFile=null,cvAbort=null;
+function cvSource(){const on=document.querySelector('#cvSrcChips .chip.on');return on?on.dataset.cvsrc:'project'}
+function cvLang(){const on=document.querySelector('#cvLangChips .chip.on');return on?on.dataset.lang:''}
+document.querySelectorAll('#cvSrcChips .chip').forEach(ch=>ch.addEventListener('click',()=>{
+  document.querySelectorAll('#cvSrcChips .chip').forEach(x=>x.classList.remove('on'));ch.classList.add('on');
+  $('cvFileRow').classList.toggle('hidden',cvSource()!=='file')}));
+document.querySelectorAll('#cvLangChips .chip').forEach(ch=>ch.addEventListener('click',()=>{
+  document.querySelectorAll('#cvLangChips .chip').forEach(x=>x.classList.remove('on'));ch.classList.add('on')}));
+$('btnPickCvFile').addEventListener('click',()=>$('fileCv').click());
+$('fileCv').addEventListener('change',e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
+  cvFile=f;$('cvFileMeta').textContent=f.name+' · '+fmtMB(f.size);$('cvSrcErr').classList.remove('show')});
+$('cvText').addEventListener('input',e=>{$('cvCount').textContent=e.target.value.length});
+function groqHeaders(key){return{Authorization:'Bearer '+key}}
+async function groqErrText(res){const d=await res.json().catch(()=>({}));
+  return (d.error&&(d.error.message||d.error.code))||('Groq error '+res.status)}
+async function groqTranscribe(key,fileBlob,name,lang,signal){
+  const fd=new FormData();
+  fd.append('file',fileBlob,name||'audio.mp3');
+  fd.append('model','whisper-large-v3');
+  fd.append('response_format','verbose_json');
+  if(lang)fd.append('language',lang);
+  const res=await fetch('https://api.groq.com/openai/v1/audio/transcriptions',
+    {method:'POST',headers:groqHeaders(key),body:fd,signal});
+  if(!res.ok)throw new Error(await groqErrText(res));
+  const data=await res.json();
+  return (data&&data.text)||''}
+const CV_TRANSLATE_SYSTEM='You are a professional audiobook translator. Translate the user\'s text faithfully into NATURAL SPOKEN-STYLE Burmese (Myanmar) suitable for audiobook narration: use everyday spoken forms instead of stiff written forms, keep all names and terms consistent, write numbers as Burmese words where natural, and preserve paragraph breaks. Output ONLY the Burmese translation — no commentary, no notes, no original text.';
+async function groqTranslate(key,text,signal){
+  const res=await fetch('https://api.groq.com/openai/v1/chat/completions',
+    {method:'POST',headers:Object.assign({'Content-Type':'application/json'},groqHeaders(key)),
+     body:JSON.stringify({model:'llama-3.3-70b-versatile',temperature:0.3,
+       messages:[{role:'system',content:CV_TRANSLATE_SYSTEM},{role:'user',content:text}]}),
+     signal});
+  if(!res.ok)throw new Error(await groqErrText(res));
+  const data=await res.json();
+  const out=data&&data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content;
+  if(!out)throw new Error('ဘာသာပြန် ပြန်မရပါ — ထပ်ကြိုးစားပါ');
+  return out.trim()}
+function splitLongText(text,max){const out=[];let rest=(text||'').trim();
+  while(rest.length>max){let cut=-1;
+    for(const sep of ['\n\n','\n','။ ','. ','! ','? ','၊ ',' ']){const i=rest.lastIndexOf(sep,max);if(i>max*0.35){cut=i+sep.length;break}}
+    if(cut<0)cut=max;
+    out.push(rest.slice(0,cut).trim());rest=rest.slice(cut).trim()}
+  if(rest)out.push(rest);return out}
+const CV_CHUNK_SEC=480; /* ~8 minutes per STT chunk */
+async function cvMakeSttChunks(blob,signal){
+  let dur=0;try{const d=await probeDuration(blob);if(isFinite(d)&&d>0)dur=d}catch(e){}
+  if(blob.size<=24*1048576&&(dur===0||dur<=CV_CHUNK_SEC))return[{blob,name:'audio'}];
+  const ACx=window.AudioContext||window.webkitAudioContext;if(!ACx)throw new Error('WebAudio မရပါ');
+  const dac=new ACx();let buf;
+  try{buf=await dac.decodeAudioData(await blob.arrayBuffer())}
+  catch(de){throw new Error('အသံဖိုင်ကို ဖတ်/ဖြည် မရပါ — MP3 (သို့) WAV ဖိုင် ပြောင်းသုံး ကြည့်ပါ')}
+  finally{if(dac.close)dac.close()}
+  if(signal&&signal.aborted)throw cancelErr();
+  const SR=16000,win=CV_CHUNK_SEC*buf.sampleRate,total=buf.length;
+  const n=Math.max(1,Math.ceil(total/win));const pieces=[];
+  const srcCh=buf.getChannelData(0);
+  for(let i=0;i<n;i++){
+    if(signal&&signal.aborted)throw cancelErr();
+    setLoadMsg('အသံ ပိုင်းဖြတ်နေသည် '+(i+1)+' / '+n);
+    const start=i*win,len=Math.min(win,total-start);
+    const off=new OfflineAudioContext(1,Math.ceil(len/buf.sampleRate*SR),SR);
+    const b2=off.createBuffer(1,len,buf.sampleRate);b2.getChannelData(0).set(srcCh.subarray(start,start+len));
+    const s=off.createBufferSource();s.buffer=b2;s.connect(off.destination);s.start();
+    const pcm=await off.startRendering();
+    if(signal&&signal.aborted)throw cancelErr();
+    const mp3=await encodeMp3Mono(pcm.getChannelData(0),SR,64,()=>!!(signal&&signal.aborted),null);
+    pieces.push({blob:mp3,name:'chunk'+(i+1)+'.mp3'})}
+  return pieces}
+$('btnCvStart').addEventListener('click',async()=>{
+  const gk=(localStorage.getItem(LS_GROQ)||'').trim();
+  if(!gk){closeSheets();openSheet('sheetSettings');highlightGroqKey();
+    showNotice('Groq API Key လိုပါတယ် — Settings မှာ အရင် ထည့်ပါ','err');return}
+  let blob=null;
+  if(cvSource()==='project'){blob=await idb.get('audio:'+state.id).catch(()=>null);
+    if(!blob){$('cvSrcErr').textContent='Project မှာ အသံ မရှိသေးပါ — အသံဖိုင် အရင် တင်ပါ (သို့) "ဖိုင် ရွေးမယ်" နည်း သုံးပါ။';$('cvSrcErr').classList.add('show');
+      showNotice('Project အသံ မရှိပါ — အသံဖိုင် အရင် တင်ပါ','err');return}}
+  else{if(!cvFile){$('cvSrcErr').textContent='ဘာသာပြန်မည့် အသံဖိုင် အရင် ရွေးပါ — "📁 ဖိုင် ရွေးမယ်" ကို နှိပ်ပါ။';$('cvSrcErr').classList.add('show');
+      showNotice('အသံဖိုင် အရင် ရွေးပါ','err');return}
+    blob=cvFile}
+  $('cvSrcErr').classList.remove('show');
+  cvAbort=('AbortController' in window)?new AbortController():null;
+  const signal=cvAbort?cvAbort.signal:undefined;
+  loadCancelFn=()=>{if(cvAbort)cvAbort.abort()};
+  showLoad('🌐 ဘာသာပြန်နေပါတယ်…','ပြင်ဆင်နေသည်…');
+  $('btnCancelExport').classList.remove('hidden');
+  let err=null,result='';
+  try{
+    const pieces=await cvMakeSttChunks(blob,signal);
+    const texts=[];
+    for(let i=0;i<pieces.length;i++){
+      if(signal&&signal.aborted)throw cancelErr();
+      setLoadMsg('စာဖော်နေသည် '+(i+1)+' / '+pieces.length);
+      texts.push(await groqTranscribe(gk,pieces[i].blob,pieces[i].name,cvLang(),signal))}
+    const transcript=texts.join(' ').trim();
+    if(!transcript)throw new Error('စာသား ဖော်၍ မရပါ — အသံ ရှင်းရှင်း ဖိုင် ပြောင်းသုံးကြည့်ပါ');
+    const tChunks=splitLongText(transcript,3000);const outs=[];
+    for(let i=0;i<tChunks.length;i++){
+      if(signal&&signal.aborted)throw cancelErr();
+      setLoadMsg('ဘာသာပြန်နေသည် '+(i+1)+' / '+tChunks.length);
+      outs.push(await groqTranslate(gk,tChunks[i],signal))}
+    result=outs.join('\n');
+  }catch(e){err=e}
+  loadCancelFn=null;cvAbort=null;hideLoad();
+  if(err){if(err.cancelled||(err&&err.name==='AbortError')||(signal&&signal.aborted))
+      showNotice('⛔ ရပ်လိုက်ပြီ — ဘာသာပြန် မလုပ်ပါ','ok');
+    else showNotice('မအောင်မြင်ပါ — '+(err&&err.message?err.message:err),'err');return}
+  $('cvText').value=result;$('cvCount').textContent=result.length;
+  $('cvResult').classList.remove('hidden');
+  showDone('✅ ဘာသာပြန် ပြီးပါပြီ','မြန်မာ စာသားကို စစ်ဆေး ပြင်ဆင်ပြီး "🎙️ Narration သို့ ပို့" နှိပ်ပါ')});
+$('btnCvToNarr').addEventListener('click',()=>{const t=$('cvText').value.trim();
+  if(!t){showNotice('ဘာသာပြန် စာသား မရှိပါ — အရင် ဘာသာပြန်ပါ','err');return}
+  $('ttsText').value=t;$('ttsCount').textContent=t.length;
+  openSheet('sheetNarrate');showNotice('Narration သို့ ပို့ပြီးပါပြီ — Engine ရွေးပြီး အသံ ထုတ်ပါ','ok')});
+$('btnCvClear').addEventListener('click',()=>{$('cvText').value='';$('cvCount').textContent='0';
+  $('cvResult').classList.add('hidden')});
+
 /* ============ init ============ */
 function refreshAll(){refreshTypoUI();
   $('audioName').textContent=state.audioName||'အသံဖိုင် မရွေးရသေးပါ';
@@ -1306,9 +1672,13 @@ function refreshAll(){refreshTypoUI();
   drawWave();drawPreview(performance.now());renderThumb()}
 refreshAll();
 loadBlobsForState().then(()=>{refreshAll()});
+initAuth();
 /* QA / debug handle */
 window.ABS={get state(){return state},openSheet,closeSheets,renderThumb,renderLibrary,
-  get jobs(){return jobs},els:{preview:$('preview'),thumb:$('thumbPreview'),wave:$('wave')}};
+  get jobs(){return jobs},els:{preview:$('preview'),thumb:$('thumbPreview'),wave:$('wave')},
+  geminiKeyList,geminiKeySlots,geminiCall,narrEngine,cvSource,cvLang,shrinkFormat,
+  splitTtsText,splitLongText,pollinationsUrl,groqTranscribe,groqTranslate,
+  get session(){return sbSession},set session(v){sbSession=v}};
 </script>
 </body>
 </html>
