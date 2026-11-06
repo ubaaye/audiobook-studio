@@ -534,6 +534,7 @@ footer.note{color:var(--dim);font-size:11px;text-align:center;line-height:1.6;ma
 
 <div class="notice" id="notice"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/mp4box@0.5.2/dist/mp4box.all.min.js"></script>
 <script>
 'use strict';
 /* ============ helpers ============ */
@@ -1420,6 +1421,132 @@ $('btnGenTts').addEventListener('click',async()=>{
   pcms.forEach(b=>{all.set(b,off);off+=b.length});
   await finishNarration(pcmToWav(all,sr))});
 
+/* ============ Segmented decode for long MP4-family sources ============
+   decodeAudioData on a whole multi-hour file builds GBs of float PCM and
+   the phone kills the tab. For .m4a/.mp4 sources we instead parse the
+   container with mp4box (fed in slices), pull ~5-min media segments,
+   decode/render/encode ONE segment at a time, and concatenate the MP3
+   byte streams — memory stays bounded no matter how long the file is. */
+const SEG_WIN_SEC=300;                    /* ~5 minutes per segment */
+const SEG_MAX_DUR=20*60,SEG_MAX_SIZE=15*1048576;   /* shrinker route limits */
+const CV_SEG_MAX_DUR=25*60;               /* converter route limit */
+function fileExt(name){const n=String(name||'');const i=n.lastIndexOf('.');
+  return i>0?n.slice(i+1).toLowerCase():''}
+function isMp4Family(f){if(!f)return false;
+  const e=fileExt(f.name),t=String(f.type||'').toLowerCase();
+  if(e==='m4a'||e==='mp4'||e==='m4v'||e==='mov')return true;
+  if(t==='audio/mp4'||t==='audio/x-m4a'||t.indexOf('video/mp4')===0)return true;
+  if(e==='aac'&&(t==='audio/mp4'||t==='audio/x-m4a'))return true; /* .aac only inside an MP4 container */
+  return false}
+function segRoute(f,durSec,maxDur,maxSize){
+  if(!isMp4Family(f))return 'whole';
+  if((durSec||0)>maxDur||((f&&f.size)||0)>maxSize)return 'segmented';
+  return 'whole'}
+function shrinkRoute(f,durSec){return segRoute(f,durSec,SEG_MAX_DUR,SEG_MAX_SIZE)}
+function cvSegRoute(f,durSec){return segRoute(f,durSec,CV_SEG_MAX_DUR,SEG_MAX_SIZE)}
+function segPlan(durSec,winSec){const w=winSec||SEG_WIN_SEC,d=Math.max(0,durSec||0);
+  const n=Math.max(1,Math.ceil(d/w));const out=[];
+  for(let i=0;i<n;i++)out.push({start:i*w,dur:Math.min(w,d-i*w)});
+  return out}
+function segProgressText(i,n){return 'အပိုင်း '+i+' / '+n}
+function concatBlobs(parts,type){return new Blob(parts,{type:type||'audio/mpeg'})}
+function shrinkSegNotice(wantFmt,usedSegmented){
+  return (usedSegmented&&wantFmt==='webm')?'ဖိုင် ရှည်လို့ MP3 အဖြစ် ထုတ်ပေးထားပါတယ်':''}
+function decodeFailMsg(name,isMp4,durSec,size){
+  if(!isMp4&&((durSec||0)>1800||(size||0)>SEG_MAX_SIZE))
+    return '"'+name+'" ဖိုင်က ရှည်လွန်း၍ ဖုန်းထဲမှာ တိုက်ရိုက် ဖတ် မရပါ — ဒီဖိုင်ကို Telegram bot (@nlo_myvoice_bot) ဆီ ပို့၍ ချုံ့/ပြောင်းပါ';
+  return '"'+name+'" ဖိုင်ကို ဖတ်/ဖြည် မရပါ — MP3 (သို့) WAV ဖိုင် ပြောင်းသုံး ကြည့်ပါ'}
+function mp4Available(){return typeof window!=='undefined'&&!!window.MP4Box&&!!window.MP4Box.createFile}
+/* Feed an MP4 file to mp4box in slices; resolves with its duration (s)
+   from container metadata only — nothing is decoded. 0 if unreadable. */
+async function mp4ProbeDuration(file){
+  if(!mp4Available()||!file)return 0;
+  const mp4=MP4Box.createFile();
+  return new Promise(res=>{
+    let done=false;const fin=d=>{if(!done){done=true;res(d||0)}};
+    mp4.onError=()=>fin(0);
+    mp4.onReady=info=>{fin(info&&info.timescale?info.duration/info.timescale:0);
+      try{mp4.stop()}catch(e){}};
+    (async()=>{const CH=2*1048576;let off=0;
+      try{while(off<file.size&&!done){
+        const ab=await file.slice(off,Math.min(file.size,off+CH)).arrayBuffer();
+        ab.fileStart=off;mp4.appendBuffer(ab);
+        off+=CH}}catch(e){}
+      fin(0)})();
+  });
+}
+/* Stream an MP4 file window by window. handlers:
+   isCancel() -> bool; onMeta(durSec,totalSegs);
+   onWindow(i,totalSegs,segBlob) -> Promise (segBlob = standalone fMP4). */
+function mp4Segmented(file,winSec,handlers){
+  handlers=handlers||{};
+  return new Promise((resolve,reject)=>{
+    if(!mp4Available()){reject(new Error('mp4box library မရပါ — အင်တာနက် ချိတ်ဆက် စစ်၍ page ပြန်ဖွင့်ပါ'));return}
+    const isCancel=handlers.isCancel||(()=>false);
+    const mp4=MP4Box.createFile();
+    let settled=false,track=null,initSeg=null,totalSegs=0,durSec=0,winIdx=0;
+    let chain=Promise.resolve();
+    const fail=e=>{if(!settled){settled=true;
+      reject(e instanceof Error?e:new Error(String(e)))}};
+    const done=()=>{if(!settled){settled=true;resolve({durSec,totalSegs:winIdx})}};
+    mp4.onError=()=>fail(new Error('MP4 ဖိုင် ဖတ် မရပါ — ဖိုင် ပျက် နေ သလား စစ်ပါ'));
+    mp4.onReady=info=>{
+      try{
+        durSec=(info&&info.timescale)?info.duration/info.timescale:0;
+        track=(info.audioTracks&&info.audioTracks[0])||null;
+        if(!track&&info.tracks)track=info.tracks.filter(t=>t.type==='audio')[0]||null;
+        if(!track){fail(new Error('အသံ track မတွေ့ပါ — အသံဖိုင် ဟုတ် မဟုတ် စစ်ပါ'));return}
+        const sr=(track.audio&&track.audio.sample_rate)||44100;
+        const fps=Math.max(1,Math.round(winSec*sr/1024));
+        totalSegs=Math.max(1,Math.ceil((track.nb_samples||fps)/fps));
+        mp4.setSegmentOptions(track.id,null,{nbSamples:fps,rapAlignement:true});
+        const inits=mp4.initializeSegmentation();
+        const iseg=inits&&(inits.filter(s=>s.id===track.id)[0]||inits[0]);
+        initSeg=iseg?iseg.buffer:null;
+        if(!initSeg)throw new Error('MP4 init segment မရပါ');
+        if(handlers.onMeta)handlers.onMeta(durSec,totalSegs);
+        mp4.start();
+      }catch(e){fail(e)}};
+    mp4.onSegment=(id,user,buffer,sampleNum,isLast)=>{
+      if(settled)return;
+      const idx=winIdx++;
+      const segBlob=new Blob([initSeg,buffer],{type:'audio/mp4'});
+      chain=chain.then(async()=>{
+        if(settled)return;
+        if(isCancel()){fail(cancelErr());return}
+        await handlers.onWindow(idx,Math.max(totalSegs,idx+1),segBlob);
+        if(isLast)done();
+      }).catch(fail)};
+    (async()=>{
+      try{
+        /* Feed strictly sequentially: following mp4box's seek hints would
+           leave holes in the media data and stall sample processing. */
+        const CH=4*1048576;let off=0;
+        while(off<file.size){
+          if(settled)return;
+          if(isCancel()){fail(cancelErr());return}
+          const ab=await file.slice(off,Math.min(file.size,off+CH)).arrayBuffer();
+          ab.fileStart=off;mp4.appendBuffer(ab);
+          off+=CH}
+        try{mp4.flush()}catch(e){}
+        chain.then(()=>{if(winIdx>0)done();
+          else if(!settled)fail(new Error('MP4 အပိုင်းများ ထုတ် မရပါ — ဖိုင် စစ်ကြည့်ပါ'))});
+      }catch(e){fail(e)}
+    })();
+  });
+}
+/* Decode ONE bounded blob and render it to mono Float32 PCM at sr. */
+async function decodeRenderMono(blob,sr){
+  const ACx=window.AudioContext||window.webkitAudioContext;
+  if(!ACx)throw new Error('WebAudio မရပါ');
+  const dac=new ACx();let buf;
+  try{buf=await dac.decodeAudioData(await blob.arrayBuffer())}
+  finally{if(dac.close)dac.close()}
+  const off=new OfflineAudioContext(1,Math.max(1,Math.ceil(buf.duration*sr)),sr);
+  const s=off.createBufferSource();s.buffer=buf;s.connect(off.destination);s.start();
+  const pcm=await off.startRendering();
+  return pcm.getChannelData(0)}
+
 /* ============ Audio shrinker — ≤19 MB, for sending to the Telegram bot ============ */
 const SHRINK_SR=24000;
 let shrinkFile=null,shrinkDur=0,shrinkBlob=null,shrinkUrl=null,shrinkCancel=false,shrinkExt='webm';
@@ -1494,6 +1621,25 @@ async function encodeMp3Mono(ch,sr,kb,isCancel,onProg){const L=await loadLame();
   return new Blob(parts,{type:'audio/mpeg'})}
 async function encodeShrinkMp3(ch,kb){return encodeMp3Mono(ch,SHRINK_SR,kb,()=>shrinkCancel,
   p=>setLoadMsg('Encode (MP3) — '+Math.round(p*100)+'%'))}
+/* Long MP4-family sources: shrink segment by segment (bounded memory).
+   The bitrate for the ≤19 MB target is picked up front from the SOURCE
+   duration — the same estimate math as the whole-file path. Output is
+   always MP3 here (segment-wise WebM muxing is not attempted). */
+async function shrinkSegmented(dur){
+  const kb=pickShrinkBitrate(dur);
+  shrinkDur=dur;refreshShrinkUI();
+  const parts=[];
+  await mp4Segmented(shrinkFile,SEG_WIN_SEC,{
+    isCancel:()=>shrinkCancel,
+    onWindow:async(i,total,segBlob)=>{
+      setLoadMsg(segProgressText(i+1,total)+' — ချုံ့နေသည်… ('+kb+' kbps · mono · MP3)');
+      const pcm=await decodeRenderMono(segBlob,SHRINK_SR);
+      if(shrinkCancel)throw cancelErr();
+      const mp3=await encodeMp3Mono(pcm,SHRINK_SR,kb,()=>shrinkCancel,null);
+      parts.push(mp3)}});
+  if(shrinkCancel)throw cancelErr();
+  if(!parts.length)throw new Error('အပိုင်းများ ထုတ် မရပါ — ဖိုင် စစ်ကြည့်ပါ');
+  return {blob:concatBlobs(parts,'audio/mpeg'),ext:'mp3',kb,segmented:true}}
 document.querySelectorAll('#shrinkFmtChips .chip').forEach(ch=>ch.addEventListener('click',()=>{
   document.querySelectorAll('#shrinkFmtChips .chip').forEach(x=>x.classList.remove('on'));ch.classList.add('on')}));
 function shrinkFormat(){const on=document.querySelector('#shrinkFmtChips .chip.on');return on?on.dataset.sfmt:'mp3'}
@@ -1505,10 +1651,22 @@ $('btnDoShrink').addEventListener('click',async()=>{
   let err=null,result=null;
   try{
     const ACx=window.AudioContext||window.webkitAudioContext;if(!ACx)throw new Error('WebAudio မရပါ');
+    /* Long MP4-family file → segmented path (whole-file decode would OOM). */
+    let segResult=null;
+    if(isMp4Family(shrinkFile)){
+      let dur=shrinkDur||0;
+      if(!dur){setLoadMsg('ဖိုင် အချက်အလက် ဖတ်နေသည်…');
+        try{dur=await mp4ProbeDuration(shrinkFile)}catch(e){dur=0}}
+      if(shrinkRoute(shrinkFile,dur)==='segmented'){
+        if(!mp4Available())throw new Error('Segment library (mp4box) မရပါ — အင်တာနက် ချိတ်ဆက် စစ်၍ page ပြန်ဖွင့်ပါ');
+        if(!dur)dur=Math.max(60,Math.round(shrinkFile.size*8/128000)); /* duration unknown — estimate @128 kbps */
+        segResult=await shrinkSegmented(dur)}}
+    if(segResult){result=segResult}
+    else{
     const dac=new ACx();
     let buf;
     try{buf=await dac.decodeAudioData(await shrinkFile.arrayBuffer())}
-    catch(de){throw new Error('"'+shrinkFile.name+'" ဖိုင်ကို ဖတ်/ဖြည် မရပါ — MP3 (သို့) WAV ဖိုင် ပြောင်းသုံး ကြည့်ပါ')}
+    catch(de){throw new Error(decodeFailMsg(shrinkFile.name,isMp4Family(shrinkFile),shrinkDur,shrinkFile.size))}
     finally{if(dac.close)dac.close()}
     if(shrinkCancel)throw cancelErr();
     shrinkDur=buf.duration;refreshShrinkUI();
@@ -1528,6 +1686,7 @@ $('btnDoShrink').addEventListener('click',async()=>{
     if(!out){try{await (wantMp3?tryOpus():tryMp3())}catch(e){if(e&&e.cancelled)throw e;
       throw new Error('Encoder မရပါ — Chrome နောက်ဆုံး version ဖြင့် ထပ်ကြိုးစားပါ')}}
     result={blob:out,ext,kb};
+    }
   }catch(e){err=e}
   loadCancelFn=null;hideLoad();
   if(err){if(err.cancelled||shrinkCancel)showNotice('⛔ ရပ်လိုက်ပြီ — ဖိုင် မချုံ့ပါ','ok');
@@ -1536,9 +1695,10 @@ $('btnDoShrink').addEventListener('click',async()=>{
   if(shrinkUrl)URL.revokeObjectURL(shrinkUrl);shrinkUrl=URL.createObjectURL(shrinkBlob);
   const before=shrinkFile.size,after=shrinkBlob.size;const pct=Math.max(0,Math.round((1-after/before)*100));
   const over=after>20*1048576;
-  $('shrinkResultMeta').textContent='မူလ '+fmtMB(before)+' → အသစ် '+fmtMB(after)+' ('+pct+'% လျော့သွားသည်) · '+result.kb+' kbps · .'+result.ext+(over?' · ⚠️ 20 MB ကျော်နေပါသေးသည် — အသံကို ပိုင်းခွဲပြီး ပို့ပါ':' · ✅ Telegram bot ဆီ ပို့နိုင်ပါပြီ');
+  const segNote=shrinkSegNotice(shrinkFormat(),!!result.segmented);
+  $('shrinkResultMeta').textContent='မူလ '+fmtMB(before)+' → အသစ် '+fmtMB(after)+' ('+pct+'% လျော့သွားသည်) · '+result.kb+' kbps · .'+result.ext+(segNote?' · '+segNote:'')+(over?' · ⚠️ 20 MB ကျော်နေပါသေးသည် — အသံကို ပိုင်းခွဲပြီး ပို့ပါ':' · ✅ Telegram bot ဆီ ပို့နိုင်ပါပြီ');
   $('shrinkResult').classList.remove('hidden');
-  showDone('✅ ချုံ့ပြီးပါပြီ','မူလ '+fmtMB(before)+' → '+fmtMB(after)+(over?' — သို့သော် 20 MB ကျော်နေပါသေးသည်':''))});
+  showDone('✅ ချုံ့ပြီးပါပြီ','မူလ '+fmtMB(before)+' → '+fmtMB(after)+(over?' — သို့သော် 20 MB ကျော်နေပါသေးသည်':'')+(segNote?' · '+segNote:''))});
 $('btnDlShrink').addEventListener('click',()=>{if(!shrinkBlob||!shrinkUrl)return;
   const a=document.createElement('a');a.href=shrinkUrl;a.download=shrinkNameBase()+'_small.'+shrinkExt;a.click()});
 $('btnUseShrink').addEventListener('click',async()=>{if(!shrinkBlob)return;
@@ -1595,10 +1755,29 @@ const CV_CHUNK_SEC=480; /* ~8 minutes per STT chunk */
 async function cvMakeSttChunks(blob,signal){
   let dur=0;try{const d=await probeDuration(blob);if(isFinite(d)&&d>0)dur=d}catch(e){}
   if(blob.size<=24*1048576&&(dur===0||dur<=CV_CHUNK_SEC))return[{blob,name:'audio'}];
+  const isCancel=()=>!!(signal&&signal.aborted);
+  /* Long MP4-family source → segmented decode into ~8-min MP3 STT chunks
+     (whole-file decode of a long file OOMs the phone). */
+  if(isMp4Family(blob)){
+    if(!dur){try{dur=await mp4ProbeDuration(blob)}catch(e){dur=0}}
+    if(cvSegRoute(blob,dur)==='segmented'){
+      if(!mp4Available())throw new Error('mp4box library မရပါ — အင်တာနက် ချိတ်ဆက် စစ်၍ page ပြန်ဖွင့်ပါ');
+      const pieces=[];
+      await mp4Segmented(blob,CV_CHUNK_SEC,{
+        isCancel,
+        onWindow:async(i,total,segBlob)=>{
+          setLoadMsg('အသံ ပိုင်းဖြတ်နေသည် '+(i+1)+' / '+total);
+          const pcm=await decodeRenderMono(segBlob,16000);
+          if(isCancel())throw cancelErr();
+          const mp3=await encodeMp3Mono(pcm,16000,64,isCancel,null);
+          pieces.push({blob:mp3,name:'chunk'+(i+1)+'.mp3'})}});
+      if(isCancel())throw cancelErr();
+      if(pieces.length)return pieces;
+      /* segmentation produced nothing — fall through to whole decode */}}
   const ACx=window.AudioContext||window.webkitAudioContext;if(!ACx)throw new Error('WebAudio မရပါ');
   const dac=new ACx();let buf;
   try{buf=await dac.decodeAudioData(await blob.arrayBuffer())}
-  catch(de){throw new Error('အသံဖိုင်ကို ဖတ်/ဖြည် မရပါ — MP3 (သို့) WAV ဖိုင် ပြောင်းသုံး ကြည့်ပါ')}
+  catch(de){throw new Error(decodeFailMsg(blob.name||'audio',isMp4Family(blob),dur,blob.size))}
   finally{if(dac.close)dac.close()}
   if(signal&&signal.aborted)throw cancelErr();
   const SR=16000,win=CV_CHUNK_SEC*buf.sampleRate,total=buf.length;
@@ -1678,6 +1857,8 @@ window.ABS={get state(){return state},openSheet,closeSheets,renderThumb,renderLi
   get jobs(){return jobs},els:{preview:$('preview'),thumb:$('thumbPreview'),wave:$('wave')},
   geminiKeyList,geminiKeySlots,geminiCall,narrEngine,cvSource,cvLang,shrinkFormat,
   splitTtsText,splitLongText,pollinationsUrl,groqTranscribe,groqTranslate,
+  isMp4Family,shrinkRoute,cvSegRoute,segPlan,segProgressText,concatBlobs,
+  shrinkSegNotice,decodeFailMsg,mp4Available,mp4ProbeDuration,SEG_WIN_SEC,
   get session(){return sbSession},set session(v){sbSession=v}};
 </script>
 </body>
