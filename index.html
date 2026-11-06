@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0b0d">
+<title>Audiobook Studio</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+@font-face{font-family:'Padauk';src:url('padauk-regular.woff2') format('woff2');font-weight:400;font-display:swap}
+@font-face{font-family:'Padauk';src:url('padauk-bold.woff2') format('woff2');font-weight:700;font-display:swap}
+:root{
+  --bg:#0a0b0d;
+  --accent:#c9d2e0;
+  --accent2:#eef2f8;
+  --txt:#f4f6fa;
+  --mut:#9aa5b5;
+  --dim:#6b7686;
+  --glassfill:linear-gradient(135deg, rgba(34,38,47,.66), rgba(19,21,26,.60) 45%, rgba(29,32,39,.64));
+  --glassline:rgba(201,210,224,.16);
+  --err:#ff8f8f;
+  --ok:#a8e6b0;
+  --r:18px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  font-family:'Padauk','Noto Sans Myanmar',sans-serif;
+  color:var(--txt);
+  background-color:var(--bg);
+  background-image:
+    radial-gradient(120% 60% at 85% -5%, rgba(238,242,248,.20), rgba(238,242,248,0) 55%),
+    radial-gradient(90% 55% at -10% 22%, rgba(201,210,224,.14), rgba(201,210,224,0) 60%),
+    linear-gradient(115deg, rgba(201,210,224,.10) 0%, rgba(201,210,224,0) 28%),
+    linear-gradient(245deg, rgba(238,242,248,.08) 0%, rgba(238,242,248,0) 34%),
+    radial-gradient(70% 40% at 50% 108%, rgba(201,210,224,.12), rgba(201,210,224,0) 65%),
+    linear-gradient(180deg, #0a0b0d 0%, #0d0f13 48%, #0a0b0d 100%);
+  background-attachment:fixed;
+  min-height:100vh;
+  padding:14px 14px 40px;
+}
+body.lock{overflow:hidden}
+button{font-family:inherit;color:inherit;background:none;border:none;cursor:pointer}
+input,textarea{font-family:inherit}
+.wrap{max-width:620px;margin:0 auto}
+.glass{
+  background:var(--glassfill);
+  border:1px solid var(--glassline);
+  border-radius:var(--r);
+  backdrop-filter:blur(16px) saturate(120%);
+  -webkit-backdrop-filter:blur(16px) saturate(120%);
+  box-shadow:0 12px 32px rgba(0,0,0,.42), inset 0 1px 0 rgba(238,242,248,.07);
+}
+header.top{display:flex;align-items:center;gap:10px;margin:2px 2px 14px}
+header.top .mark{width:40px;height:40px;border-radius:12px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(145deg,var(--accent2),var(--accent));color:#12151b;font-weight:700;font-size:20px;box-shadow:0 6px 18px rgba(0,0,0,.4)}
+header.top h1{font-size:19px;margin:0;line-height:1.15;font-weight:700}
+header.top p{margin:1px 0 0;font-size:11.5px;color:var(--mut)}
+header.top .sp{flex:1}
+.icobtn{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;
+  background:var(--glassfill);border:1px solid var(--glassline);backdrop-filter:blur(16px) saturate(120%);-webkit-backdrop-filter:blur(16px) saturate(120%)}
+.card{padding:14px;margin-bottom:12px}
+.card h2{font-size:13px;margin:0 0 10px;color:var(--accent2);font-weight:700;letter-spacing:.2px}
+.card h2 .sub{color:var(--dim);font-weight:400;font-size:11.5px}
+canvas#preview{width:100%;aspect-ratio:16/9;display:block;border-radius:12px;background:#050607;border:1px solid rgba(201,210,224,.10)}
+.transport{display:flex;align-items:center;gap:10px;margin-top:12px}
+.playbtn{width:48px;height:48px;border-radius:50%;flex:0 0 auto;font-size:19px;color:#12151b;
+  background:linear-gradient(145deg,var(--accent2),var(--accent));box-shadow:0 8px 20px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center}
+.timebox{font-size:12px;color:var(--mut);min-width:86px;text-align:center;font-variant-numeric:tabular-nums}
+canvas#wave{flex:1;height:44px;min-width:0;cursor:pointer}
+.speedbtn{padding:8px 10px;border-radius:10px;font-size:12.5px;font-weight:700;color:var(--accent2);
+  background:rgba(201,210,224,.10);border:1px solid var(--glassline)}
+.rowbtns{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.btn{display:flex;align-items:center;justify-content:center;gap:7px;padding:12px 10px;border-radius:13px;font-size:13.5px;font-weight:700;
+  background:rgba(201,210,224,.09);border:1px solid var(--glassline);color:var(--txt);text-align:center;line-height:1.25}
+.btn:active{transform:scale(.98)}
+.btn.primary{background:linear-gradient(145deg,var(--accent2),var(--accent));color:#12151b;border:none}
+.btn.wide{grid-column:1/-1}
+.btn.small{padding:9px 8px;font-size:12.5px}
+.srcmeta{display:flex;gap:12px;align-items:center}
+.coverthumb{width:64px;height:64px;border-radius:10px;object-fit:cover;background:#14171d;border:1px solid var(--glassline);flex:0 0 auto}
+.coverthumb.empty{display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:22px}
+.srcmeta .nm{font-size:13.5px;font-weight:700;word-break:break-all;line-height:1.3}
+.srcmeta .dt{font-size:11.5px;color:var(--mut);margin-top:2px;line-height:1.45}
+.hidden{display:none!important}
+/* sheets */
+.overlay{position:fixed;inset:0;background:rgba(3,4,6,.55);opacity:0;pointer-events:none;transition:opacity .22s;z-index:40}
+.overlay.open{opacity:1;pointer-events:auto}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:41;transform:translateY(105%);transition:transform .26s ease;
+  max-height:88vh;display:flex;flex-direction:column;border-radius:22px 22px 0 0;
+  background:linear-gradient(160deg, rgba(38,42,52,.92), rgba(17,19,24,.94));
+  border-top:1px solid var(--glassline);backdrop-filter:blur(16px) saturate(120%);-webkit-backdrop-filter:blur(16px) saturate(120%)}
+.sheet.open{transform:translateY(0)}
+.sheet .grab{width:42px;height:4px;border-radius:2px;background:rgba(201,210,224,.35);margin:9px auto 2px}
+.sheet .shead{display:flex;align-items:center;padding:6px 18px 10px}
+.sheet .shead h3{margin:0;font-size:16px;flex:1}
+.sheet .sbody{overflow-y:auto;padding:2px 18px 22px}
+.xbtn{width:34px;height:34px;border-radius:10px;background:rgba(201,210,224,.10);font-size:15px}
+label.fl{display:block;font-size:12.5px;color:var(--accent);margin:13px 0 5px;font-weight:700}
+label.fl:first-child{margin-top:2px}
+.inp{width:100%;padding:11px 12px;border-radius:11px;border:1px solid var(--glassline);background:rgba(10,11,13,.55);color:var(--txt);font-size:14.5px;outline:none}
+.inp:focus{border-color:var(--accent)}
+.inp.bad{border-color:var(--err);box-shadow:0 0 0 2px rgba(255,143,143,.25)}
+textarea.inp{resize:vertical;min-height:56px;line-height:1.5}
+.err-text{display:none;color:var(--err);font-size:12px;margin-top:5px;line-height:1.45}
+.err-text.show{display:block}
+input[type=range]{width:100%;accent-color:var(--accent);height:30px}
+.rv{display:flex;align-items:center;gap:10px}
+.rv output{font-size:12.5px;color:var(--accent2);min-width:44px;text-align:right;font-variant-numeric:tabular-nums}
+.swatches{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px}
+.sw{width:34px;height:34px;border-radius:10px;border:2px solid transparent;padding:0}
+.sw.on{border-color:var(--accent2);box-shadow:0 0 0 2px rgba(238,242,248,.3)}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{padding:9px 13px;border-radius:999px;font-size:12.5px;font-weight:700;background:rgba(201,210,224,.08);border:1px solid var(--glassline);color:var(--mut)}
+.chip.on{background:linear-gradient(145deg,var(--accent2),var(--accent));color:#12151b;border-color:transparent}
+.themegrid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.themecard{border-radius:13px;overflow:hidden;border:2px solid var(--glassline);padding:0;text-align:left;background:rgba(10,11,13,.4)}
+.themecard.on{border-color:var(--accent2)}
+.themecard canvas{width:100%;height:64px;display:block}
+.themecard span{display:block;padding:7px 10px;font-size:12.5px;font-weight:700}
+.layoutgrid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+canvas#thumbPreview{width:100%;aspect-ratio:16/9;display:block;border-radius:12px;background:#050607;border:1px solid rgba(201,210,224,.10)}
+.prog{height:8px;border-radius:4px;background:rgba(201,210,224,.14);overflow:hidden;margin-top:8px}
+.prog i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .2s}
+.jobitem,.projitem{padding:11px 12px;border-radius:13px;background:rgba(201,210,224,.06);border:1px solid var(--glassline);margin-bottom:9px}
+.jobitem .t,.projitem .t{font-size:13.5px;font-weight:700;line-height:1.35}
+.jobitem .m,.projitem .m{font-size:11.5px;color:var(--mut);margin-top:2px;line-height:1.5}
+.projitem .acts{display:flex;gap:7px;margin-top:9px}
+.projitem .acts .btn{flex:1}
+.empty-note{color:var(--dim);font-size:13px;text-align:center;padding:18px 6px;line-height:1.6}
+/* popups */
+.popwrap{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;background:rgba(3,4,6,.55);padding:22px}
+.popwrap.show{display:flex}
+.pop{width:100%;max-width:340px;padding:20px 18px;text-align:center;border-radius:20px;
+  background:linear-gradient(160deg, rgba(38,42,52,.95), rgba(17,19,24,.96));border:1px solid var(--glassline);
+  backdrop-filter:blur(16px) saturate(120%);-webkit-backdrop-filter:blur(16px) saturate(120%);box-shadow:0 18px 44px rgba(0,0,0,.55)}
+.pop h3{margin:0 0 6px;font-size:16px}
+.pop p{margin:0 0 14px;font-size:13px;color:var(--mut);line-height:1.55}
+.pop .rowbtns{margin-top:4px}
+.waveanim{display:flex;gap:4px;justify-content:center;align-items:flex-end;height:38px;margin:6px 0 12px}
+.waveanim i{width:5px;border-radius:3px;background:linear-gradient(180deg,var(--accent2),var(--accent));animation:wv 1s ease-in-out infinite}
+.waveanim i:nth-child(1){height:40%;animation-delay:0s}.waveanim i:nth-child(2){height:75%;animation-delay:.12s}
+.waveanim i:nth-child(3){height:100%;animation-delay:.24s}.waveanim i:nth-child(4){height:65%;animation-delay:.36s}
+.waveanim i:nth-child(5){height:85%;animation-delay:.48s}.waveanim i:nth-child(6){height:50%;animation-delay:.6s}
+.waveanim i:nth-child(7){height:70%;animation-delay:.72s}
+@keyframes wv{0%,100%{transform:scaleY(.45)}50%{transform:scaleY(1)}}
+.notice{position:fixed;left:50%;transform:translate(-50%,20px);bottom:22px;z-index:70;max-width:92vw;opacity:0;pointer-events:none;transition:all .25s;
+  padding:11px 16px;border-radius:13px;font-size:13px;font-weight:700;text-align:center;line-height:1.45;
+  background:linear-gradient(160deg, rgba(38,42,52,.96), rgba(17,19,24,.97));border:1px solid var(--glassline);
+  backdrop-filter:blur(16px) saturate(120%);-webkit-backdrop-filter:blur(16px) saturate(120%);box-shadow:0 12px 30px rgba(0,0,0,.5)}
+.notice.show{opacity:1;transform:translate(-50%,0)}
+.notice.err{border-color:rgba(255,143,143,.5);color:#ffd7d7}
+.notice.ok{border-color:rgba(168,230,176,.4)}
+footer.note{color:var(--dim);font-size:11px;text-align:center;line-height:1.6;margin-top:4px}
+@media (min-width:760px){.rowbtns{grid-template-columns:1fr 1fr 1fr}.sheet{left:50%;right:auto;width:560px;margin-left:-280px;border-radius:22px 22px 0 0}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="mark">A</div>
+    <div><h1>Audiobook Studio</h1><p>အသံစာအုပ် ဗီဒီယို &amp; Thumbnail ဖန်တီးရန်</p></div>
+    <div class="sp"></div>
+    <button class="icobtn" id="btnLibTop" aria-label="Library">▦</button>
+    <button class="icobtn" id="btnSettingsTop" aria-label="Settings">⚙</button>
+  </header>
+
+  <section class="card glass">
+    <h2>တိုက်ရိုက် အစမ်းကြည့် <span class="sub">16:9 Preview</span></h2>
+    <canvas id="preview" width="960" height="540"></canvas>
+    <div class="transport">
+      <button class="playbtn" id="btnPlay" aria-label="Play/Pause">▶</button>
+      <canvas id="wave" height="44"></canvas>
+      <div class="timebox"><span id="tCur">0:00</span> / <span id="tDur">0:00</span></div>
+      <button class="speedbtn" id="btnSpeed">1×</button>
+    </div>
+  </section>
+
+  <section class="card glass">
+    <h2>အသံ &amp; မျက်နှာဖုံး</h2>
+    <div class="srcmeta">
+      <img id="coverThumb" class="coverthumb hidden" alt="cover">
+      <div id="coverEmpty" class="coverthumb empty">▣</div>
+      <div style="flex:1;min-width:0">
+        <div class="nm" id="audioName">အသံဖိုင် မရွေးရသေးပါ</div>
+        <div class="dt" id="audioMeta">Audiobook အသံဖိုင် (MP3, M4A, WAV…) ထည့်ပါ</div>
+      </div>
+    </div>
+    <div class="rowbtns" style="margin-top:12px">
+      <button class="btn" id="btnPickAudio">🎙 အသံဖိုင် ရွေးမယ်</button>
+      <button class="btn" id="btnPickCover">🖼 မျက်နှာဖုံး ရွေးမယ်</button>
+      <button class="btn wide" id="btnAiCover">✦ AI မျက်နှာဖုံး ဖန်တီးမယ်</button>
+    </div>
+  </section>
+
+  <section class="card glass">
+    <h2>စတူဒီယို</h2>
+    <div class="rowbtns">
+      <button class="btn" data-open-sheet="sheetTypo">✎ စာသား ပြင်မယ်</button>
+      <button class="btn" data-open-sheet="sheetBg">🎞 နောက်ခံ</button>
+      <button class="btn" data-open-sheet="sheetThumb">📸 Thumbnail</button>
+      <button class="btn" data-open-sheet="sheetExport">⬆ Video ထုတ်မယ်</button>
+      <button class="btn" data-open-sheet="sheetLibrary">▦ Library</button>
+      <button class="btn" data-open-sheet="sheetSettings">⚙ Settings</button>
+    </div>
+  </section>
+
+  <footer class="note">အရာအားလုံး Browser ထဲတွင်သာ လုပ်ဆောင်သည် · အခမဲ့ · Project များ ဤဖုန်း/ Browser ထဲတွင် သိမ်းထားသည်</footer>
+</div>
+
+<input type="file" id="fileAudio" accept="audio/*" class="hidden">
+<input type="file" id="fileCover" accept="image/*" class="hidden">
+<input type="file" id="fileBgVideo" accept="video/*" class="hidden">
+<audio id="audioEl" preload="metadata" class="hidden"></audio>
+<video id="bgVideoEl" loop muted playsinline class="hidden"></video>
+
+<div class="overlay" id="overlay"></div>
+
+<!-- Typography sheet -->
+<div class="sheet" id="sheetTypo" role="dialog" aria-label="Typography">
+  <div class="grab"></div>
+  <div class="shead"><h3>✎ စာသား (Typography)</h3><button class="xbtn" data-close-sheet>✕</button></div>
+  <div class="sbody">
+    <label class="fl">ခေါင်းစဉ် — ပထမစာကြောင်း</label>
+    <input class="inp" id="tyTitle1" placeholder="ဥပမာ — ယုန်ကလေး">
+    <label class="fl">ခေါင်းစဉ် — ဒုတိယစာကြောင်း (မရှိလည်း ရ)</label>
+    <input class="inp" id="tyTitle2" placeholder="ခေါင်းစဉ် ဒုတိယစာကြောင်း">
+    <label class="fl">အောက်စာတန်း (Subtitle)</label>
+    <input class="inp" id="tySubtitle" placeholder="ဥပမာ — ပုံပြင်များ စုစည်းမှု">
+    <label class="fl">စာရေးသူ (Author)</label>
+    <input class="inp" id="tyAuthor" placeholder="စာရေးသူ အမည်">
+    <label class="fl">အပိုင်း (Episode)</label>
+    <input class="inp" id="tyEpisode" placeholder="ဥပမာ — အပိုင်း ၁">
+    <label class="fl">ခေါင်းစဉ် အရွယ်</label>
+    <div class="rv"><input type="range" id="tyTitleSize" min="30" max="120" step="1"><output id="tyTitleSizeV"></output></div>
+    <label class="fl">အောက်စာတန်း အရွယ်</label>
+    <div class="rv"><input type="range" id="tySubSize" min="16" max="60" step="1"><output id="tySubSizeV"></output></div>
+    <label class="fl">စာလုံး အရောင်</label>
+    <div class="swatches" id="tyColorSw"></div>
+    <label class="fl">အောက်ခံပြား အရောင်</label>
+    <div class="swatches" id="tyCardSw"></div>
+    <div style="height:14px"></div>
+    <button class="btn primary wide" data-close-sheet>ပြီးပြီ</button>
+  </div>
+</div>
+
+<!-- Background sheet -->
+<div class="sheet" id="sheetBg" role="dialog" aria-label="Background">
+  <div class="grab"></div>
+  <div class="shead"><h3>🎞 နောက်ခံ (Background)</h3><button class="xbtn" data-close-sheet>✕</button></div>
+  <div class="sbody">
+    <label class="fl">Animated Theme (၅) မျိုး</label>
+    <div class="themegrid" id="themeGrid"></div>
+    <label class="fl">ကိုယ်ပိုင် Loop Video</label>
+    <button class="btn wide" id="btnPickBgVideo">🎬 Loop Video ရွေးမယ်</button>
+    <div class="dt" id="bgVideoMeta" style="font-size:11.5px;color:var(--mut);margin-top:7px;line-height:1.5">Video မရွေးရသေးပါ — ရွေးထားလျှင် Theme အစား ၎င်းကို Ping-Pong လည်ပတ်ပြမည်</div>
+    <button class="btn wide hidden" id="btnClearBgVideo" style="margin-top:8px">Loop Video ဖယ်မယ်</button>
+    <div style="height:14px"></div>
+    <button class="btn primary wide" data-close-sheet>ပြီးပြီ</button>
+  </div>
+</div>
+
+<!-- Thumbnail sheet -->
+<div class="sheet" id="sheetThumb" role="dialog" aria-label="Thumbnail Studio">
+  <div class="grab"></div>
+  <div class="shead"><h3>📸 YouTube Thumbnail Studio</h3><button class="xbtn" data-close-sheet>✕</button></div>
+  <div class="sbody">
+    <canvas id="thumbPreview" width="1920" height="1080"></canvas>
+    <label class="fl">Layout (၆) မျိုး</label>
+    <div class="chips" id="layoutChips"></div>
+    <label class="fl">Thumbnail ခေါင်းစဉ် အရွယ်</label>
+    <div class="rv"><input type="range" id="thTitleSize" min="40" max="220" step="1"><output id="thTitleSizeV"></output></div>
+    <label class="fl">Thumbnail အောက်စာတန်း အရွယ်</label>
+    <div class="rv"><input type="range" id="thSubSize" min="24" max="110" step="1"><output id="thSubSizeV"></output></div>
+    <label class="fl">Thumbnail စာလုံး အရောင်</label>
+    <div class="swatches" id="thColorSw"></div>
+    <div style="height:14px"></div>
+    <button class="btn primary wide" id="btnDownloadThumb">⬇ Thumbnail PNG ဒေါင်းမယ် (1920×1080)</button>
+  </div>
+</div>
+
+<!-- Export sheet -->
+<div class="sheet" id="sheetExport" role="dialog" aria-label="Export">
+  <div class="grab"></div>
+  <div class="shead"><h3>⬆ Video ထုတ်ရန်</h3><button class="xbtn" data-close-sheet>✕</button></div>
+  <div class="sbody">
+    <p style="font-size:12.5px;color:var(--mut);line-height:1.6;margin:2px 0 4px">1920×1080 · အသံဖိုင် အပြည့်အစုံ ပါဝင်မည် · ဖိုင်အမည်သည် ခေါင်းစဉ် အတိုင်း ဖြစ်မည် · တစ်ခုပြီးမှ တစ်ခု အစဉ်လိုက် (FIFO) ထုတ်ပေးမည်</p>
+    <label class="fl">ထုတ်မည့် အရည်အသွေး</label>
+    <div class="chips" id="exportFmtChips">
+      <button class="chip on" data-fmt="auto">Auto (MP4 ရလျှင် MP4)</button>
+      <button class="chip" data-fmt="webm">WebM</button>
+    </div>
+    <div style="height:14px"></div>
+    <button class="btn primary wide" id="btnQueueExport">＋ Export Queue ထဲ ထည့်မယ်</button>
+    <label class="fl">Queue</label>
+    <div id="exportJobs"><div class="empty-note">Queue ထဲတွင် မရှိသေးပါ</div></div>
+  </div>
+</div>
+
+<!-- Library sheet -->
+<div class="sheet" id="sheetLibrary" role="dialog" aria-label="Library">
+  <div class="grab"></div>
+  <div class="shead"><h3>▦ Library</h3><button class="xbtn" data-close-sheet>✕</button></div>
+  <div class="sbody">
+    <div class="chips" id="libFilters">
+      <button class="chip on" data-filter="all">အားလုံး</button>
+      <button class="chip" data-filter="audiobook">Audiobooks</button>
+      <button class="chip" data-filter="thumbnail">Thumbnails</button>
+      <button class="chip" data-filter="youtube">YouTube Audio</button>
+      <button class="chip" data-filter="aicover">AI Covers</button>
+    </div>
+    <div style="height:12px"></div>
+    <button class="btn wide" id="btnNewProject">＋ Project အသစ်</button>
+    <div style="height:12px"></div>
+    <div id="libList"></div>
+  </div>
+</div>
+
+<!-- Settings sheet -->
+<div class="sheet" id="sheetSettings" role="dialog" aria-label="Settings">
+  <div class="grab"></div>
+  <div class="shead"><h3>⚙ Settings</h3><button class="xbtn" data-close-sheet>✕</button></div>
+  <div class="sbody">
+    <label class="fl">Gemini API Key (AI မျက်နှာဖုံး အတွက်)</label>
+    <input class="inp" id="setGeminiKey" type="password" placeholder="AIza…" autocomplete="off">
+    <div class="err-text" id="setGeminiKeyErr">AI မျက်နှာဖုံး သုံးရန် Gemini API Key လိုပါတယ် — Google AI Studio မှာ အခမဲ့ ရယူပြီး ဒီနေရာမှာ ထည့်ပါ။</div>
+    <p style="font-size:11.5px;color:var(--mut);line-height:1.6;margin:7px 0 0">Key ကို ဤ Browser ၏ localStorage ထဲတွင်သာ သိမ်းသည် — မည်သည့် server မှ မပို့ပါ။</p>
+    <div style="height:12px"></div>
+    <button class="btn primary wide" id="btnSaveKey">Key သိမ်းမယ်</button>
+    <label class="fl">Project ပြန်စရန်</label>
+    <button class="btn wide" id="btnReset">↺ Reset — လက်ရှိ Project ရှင်းမယ်</button>
+    <label class="fl">သိမ်းဆည်းထားမှု</label>
+    <div class="dt" id="storageMeta" style="font-size:12px;color:var(--mut);line-height:1.6">—</div>
+  </div>
+</div>
+
+<!-- AI cover sheet -->
+<div class="sheet" id="sheetAiCover" role="dialog" aria-label="AI Cover">
+  <div class="grab"></div>
+  <div class="shead"><h3>✦ AI မျက်နှာဖုံး</h3><button class="xbtn" data-close-sheet>✕</button></div>
+  <div class="sbody">
+    <label class="fl">ပုံ ဖော်ပြချက် (Prompt)</label>
+    <textarea class="inp" id="aiPrompt" placeholder="ဇာတ်လမ်းနှင့် ကိုက်ညီသော မျက်နှာဖုံးပုံ ဖော်ပြချက်"></textarea>
+    <div class="err-text" id="aiPromptErr">Prompt ထည့်ရန် လိုပါတယ် — ဘယ်လို ပုံ လိုချင်သလဲ ရေးပါ (သို့) ခေါင်းစဉ် အရင် ထည့်ပါ။</div>
+    <div style="height:14px"></div>
+    <button class="btn primary wide" id="btnGenAiCover">✦ ပုံ ဖန်တီးမယ်</button>
+    <p style="font-size:11.5px;color:var(--mut);line-height:1.6;margin:9px 0 0">ကိုယ်ပိုင် Gemini Key ဖြင့် Google သို့ တိုက်ရိုက် ချိတ်ဆက်သည်။ Key မရှိသေးလျှင် Settings မှာ ထည့်ပါ။</p>
+  </div>
+</div>
+
+<!-- Loading pop-up -->
+<div class="popwrap" id="loadPop"><div class="pop">
+  <div class="waveanim"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <h3 id="loadTitle">လုပ်နေပါတယ်…</h3>
+  <p id="loadMsg">ခဏ စောင့်ပါ</p>
+</div></div>
+
+<!-- Done pop-up -->
+<div class="popwrap" id="donePop"><div class="pop">
+  <h3 id="doneTitle">✅ ပြီးပါပြီ</h3>
+  <p id="doneMsg"></p>
+  <button class="btn primary wide" id="btnDoneClose">ပိတ်မယ်</button>
+</div></div>
+
+<!-- Confirm pop-up -->
+<div class="popwrap" id="confirmPop"><div class="pop">
+  <h3 id="confirmTitle">အတည်ပြုပါ</h3>
+  <p id="confirmMsg"></p>
+  <div class="rowbtns">
+    <button class="btn" id="btnConfirmNo">မလုပ်တော့ပါ</button>
+    <button class="btn primary" id="btnConfirmYes">လုပ်မယ်</button>
+  </div>
+</div></div>
+
+<div class="notice" id="notice"></div>
+<script>
+'use strict';
+/* ============ helpers ============ */
+const $=id=>document.getElementById(id);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const frac=v=>v-Math.floor(v);
+const rnd=n=>frac(Math.sin(n*127.1+311.7)*43758.5453);
+const fmtT=s=>{s=Math.max(0,Math.floor(s||0));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
+const esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function rr(ctx,x,y,w,h,r){r=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
+function coverFit(ctx,img,x,y,w,h){const s=Math.max(w/img.width,h/img.height);const dw=img.width*s,dh=img.height*s;ctx.drawImage(img,x+(w-dw)/2,y+(h-dh)/2,dw,dh)}
+
+/* ============ IndexedDB ============ */
+const idb={db:null,
+  open(){return new Promise((res,rej)=>{if(!window.indexedDB){rej(new Error('no-idb'));return}
+    const q=indexedDB.open('audiobook-studio',1);
+    q.onupgradeneeded=()=>{q.result.createObjectStore('blobs')};
+    q.onsuccess=()=>{idb.db=q.result;res()};
+    q.onerror=()=>rej(q.error)})},
+  async put(k,v){if(!idb.db)await idb.open();return new Promise((res,rej)=>{const t=idb.db.transaction('blobs','readwrite');t.objectStore('blobs').put(v,k);t.oncomplete=res;t.onerror=()=>rej(t.error)})},
+  async get(k){if(!idb.db)await idb.open();return new Promise((res,rej)=>{const q=idb.db.transaction('blobs','readonly').objectStore('blobs').get(k);q.onsuccess=()=>res(q.result||null);q.onerror=()=>rej(q.error)})},
+  async del(k){if(!idb.db)await idb.open();return new Promise((res,rej)=>{const t=idb.db.transaction('blobs','readwrite');t.objectStore('blobs').delete(k);t.oncomplete=res;t.onerror=()=>rej(t.error)})}
+};
+
+/* ============ state ============ */
+const LS_P='abs_projects',LS_C='abs_current',LS_K='abs_gemini_key';
+function defaults(){return{id:'p'+Date.now().toString(36)+Math.floor(Math.random()*999),createdAt:Date.now(),updatedAt:Date.now(),
+  title1:'',title2:'',subtitle:'',author:'',episode:'',
+  titleSize:118,subSize:54,textColor:'#f4f6fa',cardColor:'rgba(10,12,16,0.55)',
+  bgTheme:'embers',hasBgVideo:false,
+  thumbLayout:'classic',thTitleSize:150,thSubSize:64,thColor:'#ffffff',
+  audioName:'',audioDur:0,coverKind:'',thumbExported:false,videoExported:false,aiCover:false}}
+let projects=[];try{projects=JSON.parse(localStorage.getItem(LS_P)||'[]')}catch(e){projects=[]}
+let state=defaults();
+let curId=localStorage.getItem(LS_C);
+const found=projects.find(p=>p.id===curId);if(found)state=Object.assign(defaults(),found);
+let saveTimer=null;
+function saveMeta(){state.updatedAt=Date.now();const i=projects.findIndex(p=>p.id===state.id);
+  const copy=JSON.parse(JSON.stringify(state));if(i>=0)projects[i]=copy;else projects.push(copy);
+  try{localStorage.setItem(LS_P,JSON.stringify(projects));localStorage.setItem(LS_C,state.id)}catch(e){}}
+function autosave(){clearTimeout(saveTimer);saveTimer=setTimeout(saveMeta,350)}
+
+/* runtime (not persisted) */
+const RT={audioUrl:null,peaks:[],coverImg:null,coverUrl:null,bgUrl:null,playing:false,exporting:false};
+
+/* ============ popups / notices / sheets ============ */
+const overlay=$('overlay');
+function lockScroll(){const any=document.querySelector('.sheet.open')||document.querySelector('.popwrap.show');document.body.classList.toggle('lock',!!any)}
+function openSheet(id){closeSheets(true);$(id).classList.add('open');overlay.classList.add('open');lockScroll();
+  if(id==='sheetThumb')renderThumb();if(id==='sheetLibrary')renderLibrary();if(id==='sheetSettings')refreshSettings()}
+function closeSheets(keepOverlay){document.querySelectorAll('.sheet.open').forEach(s=>s.classList.remove('open'));
+  if(!keepOverlay)overlay.classList.remove('open');lockScroll()}
+overlay.addEventListener('click',()=>closeSheets());
+document.querySelectorAll('[data-open-sheet]').forEach(b=>b.addEventListener('click',()=>openSheet(b.dataset.openSheet)));
+document.querySelectorAll('[data-close-sheet]').forEach(b=>b.addEventListener('click',()=>closeSheets()));
+$('btnLibTop').addEventListener('click',()=>openSheet('sheetLibrary'));
+$('btnSettingsTop').addEventListener('click',()=>openSheet('sheetSettings'));
+function showLoad(t,m){$('loadTitle').textContent=t;$('loadMsg').textContent=m||'ခဏ စောင့်ပါ';$('loadPop').classList.add('show');lockScroll()}
+function setLoadMsg(m){$('loadMsg').textContent=m}
+function hideLoad(){$('loadPop').classList.remove('show');lockScroll()}
+function showDone(t,m){$('doneTitle').textContent=t;$('doneMsg').textContent=m||'';$('donePop').classList.add('show');lockScroll()}
+$('btnDoneClose').addEventListener('click',()=>{$('donePop').classList.remove('show');lockScroll()});
+let noticeTimer=null;
+function showNotice(msg,type){const n=$('notice');n.textContent=msg;n.className='notice show '+(type||'');
+  clearTimeout(noticeTimer);noticeTimer=setTimeout(()=>{n.className='notice'},3400)}
+let confirmRes=null;
+function confirmUi(t,m){$('confirmTitle').textContent=t;$('confirmMsg').textContent=m;$('confirmPop').classList.add('show');lockScroll();
+  return new Promise(res=>{confirmRes=res})}
+$('btnConfirmYes').addEventListener('click',()=>{$('confirmPop').classList.remove('show');lockScroll();if(confirmRes)confirmRes(true)});
+$('btnConfirmNo').addEventListener('click',()=>{$('confirmPop').classList.remove('show');lockScroll();if(confirmRes)confirmRes(false)});
+async function opBusy(title,fn){showLoad(title);try{const r=await fn();hideLoad();return r}catch(e){hideLoad();showNotice('မအောင်မြင်ပါ — '+(e&&e.message?e.message:e),'err');return null}}
+
+/* ============ swatches & chips builders ============ */
+const TEXT_COLORS=['#ffffff','#f4f6fa','#c9d2e0','#a9c8ff','#a8e6b0','#ffc4d6','#e6d7ff'];
+const CARD_COLORS=['rgba(10,12,16,0.55)','rgba(10,12,16,0.78)','rgba(24,28,38,0.55)','rgba(38,42,52,0.42)','rgba(6,20,32,0.55)','rgba(22,10,30,0.50)'];
+function buildSwatches(elId,colors,get,set){const box=$(elId);box.innerHTML='';
+  colors.forEach(c=>{const b=document.createElement('button');b.className='sw'+(get()===c?' on':'');b.style.background=c;b.setAttribute('aria-label',c);
+    b.addEventListener('click',()=>{set(c);box.querySelectorAll('.sw').forEach(x=>x.classList.remove('on'));b.classList.add('on');autosave();drawPreview(performance.now())});
+    box.appendChild(b)})}
+
+/* ============ audio engine ============ */
+const audioEl=$('audioEl');
+async function setAudioBlob(blob,name){if(RT.audioUrl)URL.revokeObjectURL(RT.audioUrl);
+  RT.audioUrl=URL.createObjectURL(blob);audioEl.src=RT.audioUrl;state.audioName=name||'အသံဖိုင်';
+  $('audioName').textContent=state.audioName;
+  await computePeaks(blob);autosave()}
+audioEl.addEventListener('loadedmetadata',()=>{state.audioDur=audioEl.duration||0;
+  $('tDur').textContent=fmtT(state.audioDur);$('audioMeta').textContent='ကြာချိန် '+fmtT(state.audioDur)+' · အစမ်းကြည့်ရှု play နှိပ်ပါ';drawWave()});
+audioEl.addEventListener('timeupdate',()=>{$('tCur').textContent=fmtT(audioEl.currentTime);drawWave()});
+audioEl.addEventListener('play',()=>{RT.playing=true;$('btnPlay').textContent='❚❚'});
+audioEl.addEventListener('pause',()=>{RT.playing=false;$('btnPlay').textContent='▶'});
+audioEl.addEventListener('ended',()=>{RT.playing=false;$('btnPlay').textContent='▶'});
+$('btnPlay').addEventListener('click',async()=>{if(!RT.audioUrl){showNotice('အသံဖိုင် အရင် ရွေးပါ — "အသံဖိုင် ရွေးမယ်" ကို နှိပ်ပါ','err');return}
+  if(audioEl.paused){try{await audioEl.play()}catch(e){showNotice('Play မရပါ — '+e.message,'err')}}else audioEl.pause()});
+const SPEEDS=[1,1.25,1.5,2,0.75];let speedIdx=0;
+$('btnSpeed').addEventListener('click',()=>{speedIdx=(speedIdx+1)%SPEEDS.length;audioEl.playbackRate=SPEEDS[speedIdx];$('btnSpeed').textContent=SPEEDS[speedIdx]+'×'});
+async function computePeaks(blob){RT.peaks=[];try{
+  const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
+  const ac=new AC();const buf=await blob.arrayBuffer();const dec=await ac.decodeAudioData(buf.slice(0));
+  const ch=dec.getChannelData(0);const N=140;const step=Math.max(1,Math.floor(ch.length/N));
+  for(let i=0;i<N;i++){let m=0;for(let j=0;j<step;j+=Math.ceil(step/40)){const v=Math.abs(ch[i*step+j]||0);if(v>m)m=v}RT.peaks.push(m)}
+  if(ac.close)ac.close()}catch(e){RT.peaks=[]}
+  drawWave()}
+function drawWave(){const c=$('wave');const ctx=c.getContext&&c.getContext('2d');if(!ctx)return;
+  const dpr=window.devicePixelRatio||1;const W=Math.max(60,c.clientWidth||260),H=44;
+  if(c.width!==W*dpr){c.width=W*dpr;c.height=H*dpr}
+  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
+  const N=RT.peaks.length||64;const bw=W/N;const dur=audioEl.duration||state.audioDur||0;
+  const prog=dur?audioEl.currentTime/dur:0;
+  for(let i=0;i<N;i++){const p=RT.peaks.length?RT.peaks[i]:0.18+0.12*Math.sin(i*0.7);
+    const h=Math.max(3,p*(H-6));const x=i*bw+bw*0.22,w=Math.max(1.4,bw*0.56);
+    ctx.fillStyle=(i/N<=prog)?'#eef2f8':'rgba(201,210,224,.38)';
+    ctx.beginPath();ctx.roundRect?ctx.roundRect(x,(H-h)/2,w,h,2):ctx.rect(x,(H-h)/2,w,h);ctx.fill()}}
+$('wave').addEventListener('click',e=>{if(!RT.audioUrl)return;const r=e.currentTarget.getBoundingClientRect();
+  const d=audioEl.duration||0;if(d)audioEl.currentTime=clamp((e.clientX-r.left)/r.width,0,1)*d});
+$('fileAudio').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
+  await opBusy('အသံဖိုင် တင်နေပါတယ်…',async()=>{await idb.put('audio:'+state.id,f);await setAudioBlob(f,f.name)});
+  showDone('✅ အသံဖိုင် ရပါပြီ','"'+state.audioName+'" — ကြာချိန် '+fmtT(state.audioDur))});
+$('btnPickAudio').addEventListener('click',()=>$('fileAudio').click());
+
+/* ============ cover ============ */
+function setCoverImg(blob,kind){if(RT.coverUrl)URL.revokeObjectURL(RT.coverUrl);
+  RT.coverUrl=URL.createObjectURL(blob);const img=new Image();
+  img.onload=()=>{RT.coverImg=img;$('coverThumb').src=RT.coverUrl;$('coverThumb').classList.remove('hidden');$('coverEmpty').classList.add('hidden');drawPreview(performance.now());renderThumb()};
+  img.src=RT.coverUrl;state.coverKind=kind;autosave()}
+$('fileCover').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
+  await opBusy('မျက်နှာဖုံး တင်နေပါတယ်…',async()=>{await idb.put('cover:'+state.id,f);state.aiCover=false;setCoverImg(f,'upload')});
+  showDone('✅ မျက်နှာဖုံး ရပါပြီ','Preview မှာ တွေ့ရပါပြီ')});
+$('btnPickCover').addEventListener('click',()=>$('fileCover').click());
+
+/* ============ AI cover (visitor's own Gemini key) ============ */
+$('btnAiCover').addEventListener('click',()=>{const p=$('aiPrompt');
+  if(!p.value.trim()){const t=[state.title1,state.title2].filter(Boolean).join(' ');
+    p.value=t?('Audiobook cover art for a Burmese story titled "'+t+'"'+(state.author?(' by '+state.author):'')+'. Rich painterly illustration, no text in the image.'):'';
+  }
+  $('aiPromptErr').classList.remove('show');p.classList.remove('bad');openSheet('sheetAiCover')});
+$('btnGenAiCover').addEventListener('click',async()=>{
+  const key=(localStorage.getItem(LS_K)||'').trim();const p=$('aiPrompt');
+  if(!p.value.trim()){p.classList.add('bad');$('aiPromptErr').classList.add('show');p.focus();return}
+  p.classList.remove('bad');$('aiPromptErr').classList.remove('show');
+  if(!key){closeSheets();openSheet('sheetSettings');const k=$('setGeminiKey');k.classList.add('bad');$('setGeminiKeyErr').classList.add('show');
+    showNotice('Gemini API Key လိုပါတယ် — Settings မှာ အရင် ထည့်ပါ','err');return}
+  const blob=await opBusy('AI မျက်နှာဖုံး ဖန်တီးနေပါတယ်…',async()=>{
+    const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent',
+      {method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},
+       body:JSON.stringify({contents:[{parts:[{text:p.value}]}],generationConfig:{responseModalities:['TEXT','IMAGE']}})});
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok)throw new Error((data.error&&data.error.message)||('Google error '+res.status));
+    const parts=(((data.candidates||[])[0]||{}).content||{}).parts||[];
+    const ip=parts.find(x=>x.inlineData&&x.inlineData.data);
+    if(!ip)throw new Error('ပုံ ပြန်မရပါ — Prompt ပြောင်းပြီး ထပ်ကြိုးစားပါ');
+    const bin=atob(ip.inlineData.data);const arr=new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
+    return new Blob([arr],{type:ip.inlineData.mimeType||'image/png'})});
+  if(blob){await idb.put('cover:'+state.id,blob);state.aiCover=true;setCoverImg(blob,'ai');
+    closeSheets();showDone('✅ AI မျက်နှာဖုံး ရပါပြီ','မျက်နှာဖုံးကို AI ဖြင့် ဖန်တီးပြီးပါပြီ')}});
+
+/* ============ backgrounds: animated themes ============ */
+const THEMES=[
+  {id:'embers',name:'Fiery Embers · မီးပွား'},
+  {id:'rain',name:'Calm Rain · မိုးဖွဲဖွဲ'},
+  {id:'night',name:'Night Sky · ညကောင်းကင်'},
+  {id:'forest',name:'Forest · သစ်တော'},
+  {id:'ocean',name:'Ocean · ပင်လယ်'}];
+function ppTime(t,period){period=period||18;const p=t%(2*period);return p<period?p:2*period-p}
+function paintTheme(ctx,w,h,id,t){
+  const g=(x0,y0,x1,y1,stops)=>{const gr=ctx.createLinearGradient(x0,y0,x1,y1);stops.forEach(s=>gr.addColorStop(s[0],s[1]));return gr};
+  if(id==='embers'){ctx.fillStyle=g(0,0,0,h,[[0,'#0c0a09'],[0.6,'#141110'],[1,'#090808']]);ctx.fillRect(0,0,w,h);
+    for(let i=0;i<7;i++){const x=rnd(i*3+1)*w,y=h*0.75+Math.sin(t*0.4+i)*6;const r=w*(0.16+rnd(i)*0.1);
+      const rg=ctx.createRadialGradient(x,y,0,x,y,r);rg.addColorStop(0,'rgba(160,60,40,0.10)');rg.addColorStop(1,'rgba(160,60,40,0)');
+      ctx.fillStyle=rg;ctx.fillRect(x-r,y-r,r*2,r*2)}
+    for(let i=0;i<44;i++){const sp=0.02+rnd(i*7)*0.05;const y=h-frac(rnd(i*13)+t*sp)*(h+30)+15;
+      const x=rnd(i*29)*w+Math.sin(t*0.8+i)*10;const a=0.25+0.55*rnd(i*3);
+      ctx.fillStyle='rgba(238,242,248,'+(a*0.85)+')';ctx.beginPath();ctx.arc(x,y,1+rnd(i*5)*1.8,0,7);ctx.fill()}}
+  else if(id==='rain'){ctx.fillStyle=g(0,0,0,h,[[0,'#0a0f16'],[1,'#111a26']]);ctx.fillRect(0,0,w,h);
+    ctx.strokeStyle='rgba(201,210,224,0.28)';ctx.lineWidth=Math.max(1,w/900);ctx.beginPath();
+    for(let i=0;i<70;i++){const sp=0.25+rnd(i*11)*0.3;const y=frac(rnd(i*17)+t*sp)*(h+40)-20;
+      const x=rnd(i*23)*w+y*0.12;ctx.moveTo(x,y);ctx.lineTo(x-3,y+12+rnd(i)*10)}ctx.stroke();
+    const rg=ctx.createRadialGradient(w*0.8,h*0.1,0,w*0.8,h*0.1,w*0.5);rg.addColorStop(0,'rgba(201,210,224,0.10)');rg.addColorStop(1,'rgba(201,210,224,0)');
+    ctx.fillStyle=rg;ctx.fillRect(0,0,w,h)}
+  else if(id==='night'){ctx.fillStyle=g(0,0,0,h,[[0,'#04060e'],[1,'#0c1425']]);ctx.fillRect(0,0,w,h);
+    for(let i=0;i<110;i++){const x=rnd(i*31)*w,y=rnd(i*37)*h*0.8;const a=0.3+0.7*Math.abs(Math.sin(t*0.7+i));
+      ctx.fillStyle='rgba(238,242,248,'+a+')';ctx.fillRect(x,y,1.6,1.6)}
+    ctx.fillStyle='rgba(238,242,248,0.92)';ctx.beginPath();ctx.arc(w*0.82,h*0.2,w*0.045,0,7);ctx.fill();
+    ctx.fillStyle='rgba(190,200,220,0.25)';ctx.beginPath();ctx.arc(w*0.80,h*0.185,w*0.045,0,7);ctx.fill();
+    ctx.fillStyle='#0a1120';ctx.beginPath();ctx.moveTo(0,h);for(let x=0;x<=w;x+=w/16){ctx.lineTo(x,h*0.86-((x/w)*0.05*h)+Math.sin(x*0.01+t*0.2)*3)}ctx.lineTo(w,h);ctx.fill()}
+  else if(id==='forest'){ctx.fillStyle=g(0,0,0,h,[[0,'#08130b'],[1,'#0e2013']]);ctx.fillRect(0,0,w,h);
+    const layer=(base,hh,col,seed,sway)=>{ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(0,h);
+      for(let x=0;x<=w;x+=w/24){const top=base-Math.abs(Math.sin(x*0.02+seed))*hh+Math.sin(t*0.5+seed+x*0.01)*sway;ctx.lineTo(x,top);ctx.lineTo(x+w/48,base)}
+      ctx.lineTo(w,h);ctx.fill()};
+    layer(h*0.72,h*0.16,'#12291a',2,2);layer(h*0.82,h*0.2,'#0c1d11',5,3);layer(h*0.94,h*0.24,'#060f08',9,1);
+    for(let i=0;i<26;i++){const x=rnd(i*41)*w,y=rnd(i*43)*h*0.5;ctx.fillStyle='rgba(220,255,225,'+(0.12+0.2*Math.sin(t+i))+')';ctx.beginPath();ctx.arc(x,y,1.3,0,7);ctx.fill()}}
+  else{ /* ocean */ ctx.fillStyle=g(0,0,0,h,[[0,'#051423'],[1,'#082f49']]);ctx.fillRect(0,0,w,h);
+    for(let b=0;b<5;b++){ctx.fillStyle='rgba(169,200,255,'+(0.05+b*0.03)+')';ctx.beginPath();ctx.moveTo(0,h);
+      for(let x=0;x<=w;x+=8){const y=h*0.45+b*h*0.11+Math.sin(x*0.012+t*(0.7+b*0.16)+b*2)*h*0.02;ctx.lineTo(x,y)}
+      ctx.lineTo(w,h);ctx.fill()}
+    ctx.fillStyle='rgba(238,242,248,0.85)';ctx.beginPath();ctx.arc(w*0.15,h*0.16,w*0.035,0,7);ctx.fill()}
+}
+const bgVideoEl=$('bgVideoEl');let bgDir=1,bgLastT=0;
+function paintBackground(ctx,w,h,tSec){
+  if(state.hasBgVideo&&bgVideoEl.readyState>=2&&bgVideoEl.videoWidth){
+    coverFit(ctx,bgVideoEl,0,0,w,h);
+    ctx.fillStyle='rgba(5,6,8,0.25)';ctx.fillRect(0,0,w,h);return}
+  paintTheme(ctx,w,h,state.bgTheme,ppTime(tSec))}
+function bgPingPong(dt){if(!state.hasBgVideo||bgVideoEl.readyState<2)return;
+  if(bgDir===1){if(bgVideoEl.paused&&bgVideoEl.currentTime<(bgVideoEl.duration||0)-0.08){bgVideoEl.play().catch(()=>{})}
+    if(bgVideoEl.duration&&bgVideoEl.currentTime>=bgVideoEl.duration-0.06){bgDir=-1;bgVideoEl.pause()}}
+  else{const nt=bgVideoEl.currentTime-dt;if(nt<=0.04){bgVideoEl.currentTime=0.04;bgDir=1;bgVideoEl.play().catch(()=>{})}
+    else{try{bgVideoEl.currentTime=nt}catch(e){}}}}
+$('fileBgVideo').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
+  await opBusy('Loop Video တင်နေပါတယ်…',async()=>{await idb.put('bg:'+state.id,f);
+    if(RT.bgUrl)URL.revokeObjectURL(RT.bgUrl);RT.bgUrl=URL.createObjectURL(f);bgVideoEl.src=RT.bgUrl;bgDir=1;
+    state.hasBgVideo=true;$('bgVideoMeta').textContent='ရွေးထားသော Video: '+f.name;$('btnClearBgVideo').classList.remove('hidden');autosave()});
+  showDone('✅ Loop Video ရပါပြီ','နောက်ခံအဖြစ် Ping-Pong လည်ပတ် ပြပါမည်')});
+$('btnPickBgVideo').addEventListener('click',()=>$('fileBgVideo').click());
+$('btnClearBgVideo').addEventListener('click',async()=>{state.hasBgVideo=false;bgVideoEl.removeAttribute('src');bgVideoEl.load();
+  await idb.del('bg:'+state.id);$('bgVideoMeta').textContent='Video မရွေးရသေးပါ — Theme ကို သုံးပါမည်';$('btnClearBgVideo').classList.add('hidden');autosave()});
+function buildThemeGrid(){const grid=$('themeGrid');grid.innerHTML='';
+  THEMES.forEach(th=>{const b=document.createElement('button');b.className='themecard'+(!state.hasBgVideo&&state.bgTheme===th.id?' on':'');
+    const cv=document.createElement('canvas');cv.width=260;cv.height=64;b.appendChild(cv);
+    const sp=document.createElement('span');sp.textContent=th.name;b.appendChild(sp);
+    const cx=cv.getContext&&cv.getContext('2d');if(cx)paintTheme(cx,260,64,th.id,3.2);
+    b.addEventListener('click',()=>{state.bgTheme=th.id;state.hasBgVideo=false;
+      grid.querySelectorAll('.themecard').forEach(x=>x.classList.remove('on'));b.classList.add('on');autosave()});
+    grid.appendChild(b)})}
+
+/* ============ preview renderer (also used for export) ============ */
+function drawScene(ctx,w,h,tSec,peaks){
+  paintBackground(ctx,w,h,tSec);
+  const S=w/1920; /* scale unit vs 1920x1080 */
+  const grad=ctx.createLinearGradient(0,h*0.45,0,h);grad.addColorStop(0,'rgba(4,5,7,0)');grad.addColorStop(1,'rgba(4,5,7,0.55)');
+  ctx.fillStyle=grad;ctx.fillRect(0,0,w,h);
+  const pw=w*0.86,ph=h*0.62,px=(w-pw)/2,py=h*0.15;
+  ctx.save();rr(ctx,px,py,pw,ph,26*S*2);ctx.fillStyle=state.cardColor;ctx.fill();
+  ctx.strokeStyle='rgba(238,242,248,0.20)';ctx.lineWidth=Math.max(1,2*S);ctx.stroke();ctx.clip();
+  const pad=pw*0.045;let tx=px+pad;
+  if(RT.coverImg){const cs=ph-pad*1.4;const cx0=px+pad,cy0=py+(ph-cs)/2;
+    ctx.save();rr(ctx,cx0,cy0,cs,cs,18*S*2);ctx.clip();coverFit(ctx,RT.coverImg,cx0,cy0,cs,cs);ctx.restore();
+    ctx.strokeStyle='rgba(238,242,248,0.35)';ctx.lineWidth=Math.max(1,2*S);rr(ctx,cx0,cy0,cs,cs,18*S*2);ctx.stroke();
+    tx=cx0+cs+pad}
+  const tw=px+pw-pad-tx;let ty=py+ph*0.16;
+  ctx.textAlign='left';ctx.textBaseline='alphabetic';
+  ctx.shadowColor='rgba(0,0,0,0.65)';ctx.shadowBlur=10*S;ctx.shadowOffsetY=3*S;
+  if(state.episode){ctx.font='700 '+(30*S*2)+'px Padauk, sans-serif';
+    const ew=ctx.measureText(state.episode).width+44*S;
+    ctx.fillStyle='rgba(238,242,248,0.92)';rr(ctx,tx,ty-34*S*2,ew,44*S*2,22*S*2);ctx.fill();
+    ctx.shadowBlur=0;ctx.fillStyle='#12151b';ctx.fillText(state.episode,tx+22*S,ty);ty+=64*S*2;ctx.shadowBlur=10*S}
+  ctx.fillStyle=state.textColor;
+  const titlePx=state.titleSize*(w/960);
+  ctx.font='700 '+titlePx+'px Padauk, sans-serif';
+  [state.title1,state.title2].filter(Boolean).forEach(line=>{ty+=titlePx*1.02;fitFillText(ctx,line,tx,ty,tw);ty+=titlePx*0.28});
+  if(state.subtitle){const subPx=state.subSize*(w/960);ctx.font='400 '+subPx+'px Padauk, sans-serif';
+    ctx.fillStyle=hexA(state.textColor,0.88);ty+=subPx*1.15;fitFillText(ctx,state.subtitle,tx,ty,tw);ty+=subPx*0.2}
+  if(state.author){const aPx=state.subSize*0.82*(w/960);ctx.font='400 '+aPx+'px Padauk, sans-serif';
+    ctx.fillStyle='rgba(238,242,248,0.75)';ty+=aPx*1.5;fitFillText(ctx,state.author,tx,ty,tw)}
+  ctx.restore();
+  /* waveform strip + progress */
+  const wy=h*0.865,wh=h*0.075;const N=(peaks&&peaks.length)||64;const bw=w*0.86/N;
+  const dur=audioEl.duration||state.audioDur||0;const prog=dur?clamp(audioEl.currentTime/dur,0,1):0;
+  for(let i=0;i<N;i++){const p=peaks&&peaks.length?peaks[i]:0.2+0.14*Math.sin(i*0.6+tSec*2);
+    const bh=Math.max(2,p*wh);const x=w*0.07+i*bw+bw*0.2;
+    ctx.fillStyle=(i/N<=prog)?'rgba(238,242,248,0.95)':'rgba(201,210,224,0.4)';
+    ctx.fillRect(x,wy+(wh-bh)/2,Math.max(1.4,bw*0.6),bh)}
+  ctx.fillStyle='rgba(238,242,248,0.85)';ctx.font='400 '+(26*(w/960)*0.5+8)+'px Padauk, sans-serif';ctx.textAlign='right';
+  ctx.fillText(fmtT(audioEl.currentTime||0)+' / '+fmtT(dur),w*0.93,wy-10*(w/960)*0.5)}
+function fitFillText(ctx,text,x,y,maxW){let s=text;if(ctx.measureText(s).width>maxW){while(s.length>1&&ctx.measureText(s+'…').width>maxW)s=s.slice(0,-1);s+='…'}ctx.fillText(s,x,y)}
+function hexA(hex,a){if(!hex||hex[0]!=='#'||hex.length<7)return hex;const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return 'rgba('+r+','+g+','+b+','+a+')'}
+const preview=$('preview');const pctx=preview.getContext&&preview.getContext('2d');
+let lastFrame=performance.now();
+function drawPreview(now){const dt=Math.min(0.05,(now-lastFrame)/1000);lastFrame=now;bgPingPong(dt);
+  if(pctx)drawScene(pctx,preview.width,preview.height,now/1000,RT.peaks)}
+function loop(now){drawPreview(now);if(window.requestAnimationFrame)requestAnimationFrame(loop)}
+if(window.requestAnimationFrame)requestAnimationFrame(loop);
+</script>
+<script>
+'use strict';
+/* ============ typography bindings ============ */
+function bindText(id,key){const el=$(id);el.value=state[key]||'';
+  el.addEventListener('input',()=>{state[key]=el.value;autosave();drawPreview(performance.now());renderThumb()})}
+bindText('tyTitle1','title1');bindText('tyTitle2','title2');bindText('tySubtitle','subtitle');
+bindText('tyAuthor','author');bindText('tyEpisode','episode');
+function bindRange(id,out,key,fmt){const el=$(id);el.value=state[key];$(out).textContent=fmt(state[key]);
+  el.addEventListener('input',()=>{state[key]=+el.value;$(out).textContent=fmt(state[key]);autosave();drawPreview(performance.now());renderThumb()})}
+bindRange('tyTitleSize','tyTitleSizeV','titleSize',v=>v+' px');
+bindRange('tySubSize','tySubSizeV','subSize',v=>v+' px');
+buildSwatches('tyColorSw',TEXT_COLORS,()=>state.textColor,c=>{state.textColor=c});
+buildSwatches('tyCardSw',CARD_COLORS,()=>state.cardColor,c=>{state.cardColor=c});
+function refreshTypoUI(){['tyTitle1','tyTitle2','tySubtitle','tyAuthor','tyEpisode'].forEach((id,i)=>{
+    $(id).value=[state.title1,state.title2,state.subtitle,state.author,state.episode][i]||''});
+  $('tyTitleSize').value=state.titleSize;$('tyTitleSizeV').textContent=state.titleSize+' px';
+  $('tySubSize').value=state.subSize;$('tySubSizeV').textContent=state.subSize+' px';
+  buildSwatches('tyColorSw',TEXT_COLORS,()=>state.textColor,c=>{state.textColor=c});
+  buildSwatches('tyCardSw',CARD_COLORS,()=>state.cardColor,c=>{state.cardColor=c});
+  $('thTitleSize').value=state.thTitleSize;$('thTitleSizeV').textContent=state.thTitleSize+' px';
+  $('thSubSize').value=state.thSubSize;$('thSubSizeV').textContent=state.thSubSize+' px';
+  buildSwatches('thColorSw',TEXT_COLORS,()=>state.thColor,c=>{state.thColor=c});
+  buildThemeGrid();renderLayoutChips()}
+
+/* ============ Thumbnail Studio (1920x1080) ============ */
+const LAYOUTS=[
+  {id:'classic',name:'Classic Split'},{id:'poster',name:'Poster Focus'},
+  {id:'dramatic',name:'Dramatic Split'},{id:'minimal',name:'Minimal Aura'},
+  {id:'cinematic',name:'Cinematic Landscape'},{id:'thriller',name:'Action & Crime Thriller'}];
+function renderLayoutChips(){const box=$('layoutChips');box.innerHTML='';
+  LAYOUTS.forEach(l=>{const b=document.createElement('button');b.className='chip'+(state.thumbLayout===l.id?' on':'');b.textContent=l.name;
+    b.addEventListener('click',()=>{state.thumbLayout=l.id;box.querySelectorAll('.chip').forEach(x=>x.classList.remove('on'));b.classList.add('on');autosave();renderThumb()});
+    box.appendChild(b)})}
+bindRange('thTitleSize','thTitleSizeV','thTitleSize',v=>v+' px');
+bindRange('thSubSize','thSubSizeV','thSubSize',v=>v+' px');
+buildSwatches('thColorSw',TEXT_COLORS,()=>state.thColor,c=>{state.thColor=c});
+function thumbBackdrop(ctx,w,h){if(RT.coverImg){coverFit(ctx,RT.coverImg,0,0,w,h);
+    ctx.fillStyle='rgba(5,6,9,0.45)';ctx.fillRect(0,0,w,h)}
+  else paintTheme(ctx,w,h,state.bgTheme,7)}
+function thumbTexts(ctx,align,cx,topY,maxW){const col=state.thColor;let y=topY;
+  ctx.textAlign=align;ctx.shadowColor='rgba(0,0,0,0.7)';ctx.shadowBlur=14;ctx.shadowOffsetY=4;
+  if(state.episode){ctx.font='700 44px Padauk, sans-serif';const label=state.episode;
+    const ew=ctx.measureText(label).width+52;const ex=align==='center'?cx-ew/2:cx;
+    ctx.fillStyle='rgba(238,242,248,0.95)';rr(ctx,ex,y-40,ew,58,29);ctx.fill();
+    ctx.shadowBlur=0;ctx.fillStyle='#12151b';const tx=align==='center'?cx:cx+26;ctx.fillText(label,tx,y);y+=44;ctx.shadowBlur=14}
+  ctx.fillStyle=col;ctx.font='700 '+state.thTitleSize+'px Padauk, sans-serif';
+  [state.title1||'ခေါင်းစဉ်',state.title2].filter(Boolean).forEach(line=>{y+=state.thTitleSize*1.04;fitFillText(ctx,line,cx,y,maxW);y+=state.thTitleSize*0.22});
+  if(state.subtitle){ctx.font='400 '+state.thSubSize+'px Padauk, sans-serif';ctx.fillStyle=hexA(col==='#ffffff'?'#f4f6fa':col,0.9);
+    y+=state.thSubSize*1.2;fitFillText(ctx,state.subtitle,cx,y,maxW);y+=state.thSubSize*0.2}
+  if(state.author){ctx.font='400 '+(state.thSubSize*0.85)+'px Padauk, sans-serif';ctx.fillStyle='rgba(238,242,248,0.8)';
+    y+=state.thSubSize*1.3;fitFillText(ctx,state.author,cx,y,maxW)}
+  ctx.shadowBlur=0;return y}
+function renderThumb(){const c=$('thumbPreview');const ctx=c.getContext&&c.getContext('2d');if(!ctx)return;
+  const w=c.width,h=c.height;const L=state.thumbLayout;
+  ctx.clearRect(0,0,w,h);
+  if(L==='classic'){thumbBackdrop(ctx,w,h);ctx.fillStyle='rgba(6,8,11,0.88)';ctx.fillRect(w*0.44,0,w*0.56,h);
+    if(RT.coverImg){ctx.save();ctx.beginPath();ctx.rect(70,90,w*0.34,h-180);ctx.clip();coverFit(ctx,RT.coverImg,70,90,w*0.34,h-180);ctx.restore();
+      ctx.strokeStyle='rgba(238,242,248,0.4)';ctx.lineWidth=3;ctx.strokeRect(70,90,w*0.34,h-180)}
+    thumbTexts(ctx,'left',w*0.5,h*0.2,w*0.44)}
+  else if(L==='poster'){thumbBackdrop(ctx,w,h);
+    ctx.fillStyle='rgba(5,6,9,0.35)';ctx.fillRect(0,0,w,h);
+    if(RT.coverImg){const cw=w*0.3,chh=cw*1.25;ctx.save();rr(ctx,(w-cw)/2,h*0.08,cw,chh,20);ctx.clip();coverFit(ctx,RT.coverImg,(w-cw)/2,h*0.08,cw,chh);ctx.restore();
+      ctx.strokeStyle='rgba(238,242,248,0.45)';ctx.lineWidth=3;rr(ctx,(w-cw)/2,h*0.08,cw,chh,20);ctx.stroke()}
+    thumbTexts(ctx,'center',w/2,h*0.66,w*0.8)}
+  else if(L==='dramatic'){paintTheme(ctx,w,h,state.bgTheme,11);
+    ctx.fillStyle='rgba(6,8,11,0.55)';ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(w*0.62,0);ctx.lineTo(w*0.42,h);ctx.lineTo(0,h);ctx.fill();
+    if(RT.coverImg){ctx.save();ctx.beginPath();ctx.moveTo(w*0.6,0);ctx.lineTo(w,0);ctx.lineTo(w,h);ctx.lineTo(w*0.44,h);ctx.closePath();ctx.clip();coverFit(ctx,RT.coverImg,w*0.44,0,w*0.56,h);ctx.restore()}
+    ctx.fillStyle='#eef2f8';ctx.fillRect(90,h*0.16,10,150);
+    thumbTexts(ctx,'left',120,h*0.24,w*0.42)}
+  else if(L==='minimal'){if(RT.coverImg){coverFit(ctx,RT.coverImg,0,0,w,h);
+      ctx.fillStyle='rgba(5,6,9,0.72)';ctx.fillRect(0,0,w,h)}
+    else paintTheme(ctx,w,h,state.bgTheme,5);
+    if(RT.coverImg){const cs=300;ctx.save();rr(ctx,(w-cs)/2,h*0.16,cs,cs,24);ctx.clip();coverFit(ctx,RT.coverImg,(w-cs)/2,h*0.16,cs,cs);ctx.restore()}
+    thumbTexts(ctx,'center',w/2,h*0.52,w*0.7)}
+  else if(L==='cinematic'){thumbBackdrop(ctx,w,h);
+    ctx.fillStyle='#000';ctx.fillRect(0,0,w,h*0.13);ctx.fillRect(0,h*0.87,w,h*0.13);
+    const gr=ctx.createLinearGradient(0,h*0.45,0,h*0.9);gr.addColorStop(0,'rgba(4,5,7,0)');gr.addColorStop(1,'rgba(4,5,7,0.8)');
+    ctx.fillStyle=gr;ctx.fillRect(0,h*0.4,w,h*0.5);
+    thumbTexts(ctx,'left',110,h*0.6,w*0.75)}
+  else{ /* thriller */ paintTheme(ctx,w,h,'embers',9);
+    ctx.fillStyle='rgba(4,4,6,0.62)';ctx.fillRect(0,0,w,h);
+    if(RT.coverImg){ctx.save();ctx.translate(w*0.74,h*0.52);ctx.rotate(-0.045);
+      ctx.shadowColor='rgba(0,0,0,0.8)';ctx.shadowBlur=50;coverFit(ctx,RT.coverImg,-w*0.17,-h*0.31,w*0.34,h*0.62);ctx.restore()}
+    ctx.fillStyle='#eef2f8';ctx.fillRect(100,h*0.2,150,12);
+    thumbTexts(ctx,'left',100,h*0.3,w*0.5);
+    ctx.font='700 40px Padauk, sans-serif';ctx.fillStyle='rgba(238,242,248,0.75)';ctx.textAlign='left';
+    ctx.fillText('AUDIOBOOK',100,h*0.9)}
+}
+$('btnDownloadThumb').addEventListener('click',async()=>{
+  if(!state.title1.trim()&&!RT.coverImg){showNotice('Thumbnail မထုတ်မီ ခေါင်းစဉ် ထည့် (သို့) မျက်နှာဖုံး အရင် တင်ပါ','err');return}
+  renderThumb();const c=$('thumbPreview');
+  const done=await opBusy('Thumbnail ထုတ်နေပါတယ်…',async()=>{return await new Promise(res=>{
+    if(c.toBlob)c.toBlob(b=>res(b),'image/png');else res(null)})});
+  if(done){const a=document.createElement('a');a.href=URL.createObjectURL(done);
+    a.download='thumbnail-'+(fileBase()||'audiobook')+'.png';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+    state.thumbExported=true;saveMeta();showDone('✅ Thumbnail ရပါပြီ','1920×1080 PNG ဒေါင်းလုဒ် စတင်ပါပြီ')}
+  else showNotice('PNG ထုတ်၍ မရပါ — Browser က Canvas download မရပါ','err')});
+function fileBase(){return [state.title1,state.title2].filter(Boolean).join(' ').trim().replace(/[\\/:*?"<>|]/g,'').replace(/\s+/g,' ').slice(0,80)}
+
+/* ============ Video export (FIFO queue) ============ */
+const jobs=[];let queueRunning=false;
+function renderJobs(){const box=$('exportJobs');
+  if(!jobs.length){box.innerHTML='<div class="empty-note">Queue ထဲတွင် မရှိသေးပါ</div>';return}
+  box.innerHTML='';jobs.forEach(j=>{const d=document.createElement('div');d.className='jobitem';
+    d.innerHTML='<div class="t">'+esc(j.title)+'</div><div class="m">'+esc(j.status)+'</div><div class="prog"><i style="width:'+Math.round(j.progress*100)+'%"></i></div>';
+    box.appendChild(d)})}
+function pickMime(fmt){const cands=fmt==='webm'
+    ?['video/webm;codecs=vp9,opus','video/webm']
+    :['video/mp4;codecs=avc1.640028,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm'];
+  if(typeof MediaRecorder==='undefined')return null;
+  for(const m of cands){try{if(MediaRecorder.isTypeSupported(m))return m}catch(e){}}
+  return ''}
+document.querySelectorAll('#exportFmtChips .chip').forEach(ch=>ch.addEventListener('click',()=>{
+  document.querySelectorAll('#exportFmtChips .chip').forEach(x=>x.classList.remove('on'));ch.classList.add('on')}));
+function exportFormat(){const on=document.querySelector('#exportFmtChips .chip.on');return on?on.dataset.fmt:'auto'}
+$('btnQueueExport').addEventListener('click',async()=>{
+  if(!RT.audioUrl){showNotice('အသံဖိုင် အရင် ထည့်ပါ — "အသံဖိုင် ရွေးမယ်" မှ တင်ပါ','err');return}
+  const fmt=exportFormat();
+  if(typeof MediaRecorder==='undefined'||!document.createElement('canvas').captureStream){
+    showNotice('ဤ Browser တွင် Video Export မရပါ — Chrome နောက်ဆုံး version သုံးပါ','err');return}
+  const job={id:'j'+Date.now().toString(36),title:(fileBase()||state.audioName||'audiobook'),
+    fmt,progress:0,status:'စောင့်ဆိုင်းနေသည်…',snapshot:JSON.parse(JSON.stringify(state))};
+  jobs.push(job);renderJobs();showNotice('Queue ထဲ ထည့်ပြီးပါပြီ — အစဉ်လိုက် ထုတ်ပေးပါမည်','ok');
+  processQueue()});
+async function processQueue(){if(queueRunning)return;queueRunning=true;
+  while(jobs.length){const job=jobs[0];
+    try{await runExport(job);job.status='✅ ပြီးပါပြီ';job.progress=1;renderJobs();
+      showDone('✅ Video ရပါပြီ','"'+job.title+'" ဒေါင်းလုဒ် စတင်ပါပြီ')}
+    catch(e){job.status='❌ မအောင်မြင် — '+(e&&e.message?e.message:e);renderJobs();showNotice('Export မအောင်မြင်ပါ — '+job.status,'err')}
+    jobs.shift();renderJobs();await new Promise(r=>setTimeout(r,300))}
+  queueRunning=false}
+let AC=null,mediaSrc=null,gainNode=null;
+function ensureAudioGraph(){const ACtx=window.AudioContext||window.webkitAudioContext;if(!ACtx)return null;
+  if(!AC){AC=new ACtx();mediaSrc=AC.createMediaElementSource(audioEl);gainNode=AC.createGain();
+    mediaSrc.connect(gainNode);gainNode.connect(AC.destination)}
+  return AC}
+async function runExport(job){job.status='ပြင်ဆင်နေသည်…';renderJobs();
+  const cv=document.createElement('canvas');cv.width=1920;cv.height=1080;
+  const cx=cv.getContext&&cv.getContext('2d');if(!cx)throw new Error('Canvas မရပါ');
+  const ac=ensureAudioGraph();if(!ac)throw new Error('WebAudio မရပါ');
+  await ac.resume();
+  const vStream=cv.captureStream(30);
+  const aDest=ac.createMediaStreamDestination();gainNode.connect(aDest);
+  const out=new MediaStream([...vStream.getVideoTracks(),...aDest.stream.getAudioTracks()]);
+  const mime=pickMime(job.fmt);if(mime===null)throw new Error('MediaRecorder မရပါ');
+  const rec=new MediaRecorder(out,mime?{mimeType:mime,videoBitsPerSecond:10_000_000,audioBitsPerSecond:192_000}:{videoBitsPerSecond:10_000_000});
+  const chunks=[];rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
+  const stopped=new Promise(res=>{rec.onstop=res});
+  const savedState=state;state=Object.assign(defaults(),job.snapshot);
+  const wasPlaying=!audioEl.paused;audioEl.pause();audioEl.currentTime=0;
+  RT.exporting=true;job.status='🎬 Render လုပ်နေသည်…';renderJobs();
+  showLoad('Video ထုတ်နေပါတယ်…','0% — "'+job.title+'"');
+  let rafId=null;const t0=performance.now();
+  const drawLoop=()=>{drawScene(cx,1920,1080,performance.now()/1000,RT.peaks);
+    const d=audioEl.duration||0;job.progress=d?clamp(audioEl.currentTime/d,0,1):0;
+    if(Math.floor(job.progress*100)%2===0){setLoadMsg(Math.round(job.progress*100)+'% — "'+job.title+'"');renderJobs()}
+    rafId=requestAnimationFrame(drawLoop)};
+  try{rec.start(250);await audioEl.play();drawLoop();
+    await new Promise((res,rej)=>{audioEl.addEventListener('ended',res,{once:true});
+      setTimeout(()=>rej(new Error('အချိန် ကျော်သွားသည်')),((audioEl.duration||0)+30)*1000)});
+    await new Promise(r=>setTimeout(r,350));rec.stop();await stopped}
+  finally{cancelAnimationFrame(rafId);audioEl.pause();gainNode.disconnect(aDest);
+    state=savedState;RT.exporting=false;hideLoad();refreshAll()}
+  const ext=(mime&&mime.indexOf('mp4')>=0)?'mp4':'webm';
+  const blob=new Blob(chunks,{type:mime||'video/webm'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=job.title+'.'+ext;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),6000);
+  state.videoExported=true;saveMeta()}
+
+/* ============ Library ============ */
+let libFilter='all';
+document.querySelectorAll('#libFilters .chip').forEach(ch=>ch.addEventListener('click',()=>{
+  document.querySelectorAll('#libFilters .chip').forEach(x=>x.classList.remove('on'));ch.classList.add('on');
+  libFilter=ch.dataset.filter;renderLibrary()}));
+function projKinds(p){const k=[];if(p.audioName)k.push('audiobook');if(p.thumbExported)k.push('thumbnail');
+  if(p.videoExported)k.push('youtube');if(p.aiCover)k.push('aicover');return k}
+function renderLibrary(){const box=$('libList');saveMeta();
+  const list=projects.slice().sort((a,b)=>b.updatedAt-a.updatedAt)
+    .filter(p=>libFilter==='all'||projKinds(p).includes(libFilter));
+  if(!list.length){box.innerHTML='<div class="empty-note">Project မရှိသေးပါ</div>';return}
+  box.innerHTML='';list.forEach(p=>{const d=document.createElement('div');d.className='projitem';
+    const name=[p.title1,p.title2].filter(Boolean).join(' ')||p.audioName||'အမည်မဲ့ Project';
+    const badges=projKinds(p).map(k=>({audiobook:'🎧 Audiobook',thumbnail:'📸 Thumbnail',youtube:'▶ YouTube',aicover:'✦ AI Cover'}[k])).join(' · ');
+    d.innerHTML='<div class="t">'+esc(name)+(p.id===state.id?' · (လက်ရှိ)':'')+'</div><div class="m">'+
+      new Date(p.updatedAt).toLocaleString()+(badges?'<br>'+esc(badges):'')+'</div>';
+    const acts=document.createElement('div');acts.className='acts';
+    const bOpen=document.createElement('button');bOpen.className='btn small';bOpen.textContent='ဖွင့်မယ်';
+    bOpen.addEventListener('click',()=>loadProject(p.id));
+    const bDel=document.createElement('button');bDel.className='btn small';bDel.textContent='ဖျက်မယ်';
+    bDel.addEventListener('click',async()=>{if(await confirmUi('Project ဖျက်မလား?','"'+name+'" နှင့် ၎င်း၏ ဖိုင်များ ပျက်သွားပါမည်')){
+      await idb.del('audio:'+p.id);await idb.del('cover:'+p.id);await idb.del('bg:'+p.id);
+      projects=projects.filter(x=>x.id!==p.id);
+      if(p.id===state.id){state=defaults();await loadBlobsForState();refreshAll()}
+      saveMeta();renderLibrary();showNotice('ဖျက်ပြီးပါပြီ','ok')}});
+    acts.appendChild(bOpen);acts.appendChild(bDel);d.appendChild(acts);box.appendChild(d)})}
+$('btnNewProject').addEventListener('click',async()=>{saveMeta();state=defaults();
+  RT.peaks=[];if(RT.audioUrl){URL.revokeObjectURL(RT.audioUrl);RT.audioUrl=null}audioEl.removeAttribute('src');audioEl.load();
+  RT.coverImg=null;$('coverThumb').classList.add('hidden');$('coverEmpty').classList.remove('hidden');
+  bgVideoEl.removeAttribute('src');saveMeta();refreshAll();closeSheets();showNotice('Project အသစ် စတင်ပါပြီ','ok')});
+async function loadProject(id){const p=projects.find(x=>x.id===id);if(!p)return;
+  saveMeta();state=Object.assign(defaults(),p);localStorage.setItem(LS_C,id);
+  await opBusy('Project ဖွင့်နေပါတယ်…',async()=>{await loadBlobsForState()});
+  refreshAll();closeSheets();showNotice('Project ဖွင့်ပြီးပါပြီ','ok')}
+async function loadBlobsForState(){
+  const ab=await idb.get('audio:'+state.id).catch(()=>null);
+  if(ab){if(RT.audioUrl)URL.revokeObjectURL(RT.audioUrl);RT.audioUrl=URL.createObjectURL(ab);audioEl.src=RT.audioUrl;
+    $('audioName').textContent=state.audioName||'အသံဖိုင်';await computePeaks(ab)}
+  else{RT.audioUrl=null;audioEl.removeAttribute('src');$('audioName').textContent=state.audioName||'အသံဖိုင် မရွေးရသေးပါ';RT.peaks=[]}
+  const cb=await idb.get('cover:'+state.id).catch(()=>null);
+  if(cb)setCoverImg(cb,state.coverKind||'upload');
+  else{RT.coverImg=null;$('coverThumb').classList.add('hidden');$('coverEmpty').classList.remove('hidden')}
+  const bb=await idb.get('bg:'+state.id).catch(()=>null);
+  if(bb&&state.hasBgVideo){if(RT.bgUrl)URL.revokeObjectURL(RT.bgUrl);RT.bgUrl=URL.createObjectURL(bb);bgVideoEl.src=RT.bgUrl;bgDir=1;
+    $('bgVideoMeta').textContent='ရွေးထားသော Loop Video ရှိပါသည်';$('btnClearBgVideo').classList.remove('hidden')}
+  drawWave()}
+
+/* ============ Settings ============ */
+function refreshSettings(){$('setGeminiKey').value=localStorage.getItem(LS_K)||'';
+  $('storageMeta').textContent='Project စုစုပေါင်း: '+projects.length+' ခု · ဖိုင်များကို ဤ Browser ၏ IndexedDB တွင် သိမ်းထားသည်'}
+$('btnSaveKey').addEventListener('click',()=>{const v=$('setGeminiKey').value.trim();
+  if(v)localStorage.setItem(LS_K,v);else localStorage.removeItem(LS_K);
+  $('setGeminiKey').classList.remove('bad');$('setGeminiKeyErr').classList.remove('show');
+  showDone('✅ Key သိမ်းပြီးပါပြီ',v?'AI မျက်နှာဖုံး သုံးနိုင်ပါပြီ':'Key ဖယ်ပြီးပါပြီ')});
+$('btnReset').addEventListener('click',async()=>{
+  if(!await confirmUi('Reset လုပ်မလား?','လက်ရှိ Project ၏ စာသား၊ အသံ၊ မျက်နှာဖုံး၊ နောက်ခံ အားလုံး ရှင်းသွားပါမည်'))return;
+  const id=state.id;await idb.del('audio:'+id);await idb.del('cover:'+id);await idb.del('bg:'+id);
+  state=defaults();state.id=id;RT.peaks=[];RT.coverImg=null;
+  if(RT.audioUrl){URL.revokeObjectURL(RT.audioUrl);RT.audioUrl=null}
+  audioEl.removeAttribute('src');audioEl.load();bgVideoEl.removeAttribute('src');
+  $('coverThumb').classList.add('hidden');$('coverEmpty').classList.remove('hidden');
+  $('audioName').textContent='အသံဖိုင် မရွေးရသေးပါ';$('audioMeta').textContent='Audiobook အသံဖိုင် (MP3, M4A, WAV…) ထည့်ပါ';
+  $('bgVideoMeta').textContent='Video မရွေးရသေးပါ';$('btnClearBgVideo').classList.add('hidden');
+  saveMeta();refreshAll();showDone('✅ Reset ပြီးပါပြီ','Project အသစ် ပြန်စနိုင်ပါပြီ')});
+
+/* ============ init ============ */
+function refreshAll(){refreshTypoUI();
+  $('audioName').textContent=state.audioName||'အသံဖိုင် မရွေးရသေးပါ';
+  if(state.audioDur)$('tDur').textContent=fmtT(state.audioDur);
+  if(!state.hasBgVideo)$('btnClearBgVideo').classList.add('hidden');
+  drawWave();drawPreview(performance.now());renderThumb()}
+refreshAll();
+loadBlobsForState().then(()=>{refreshAll()});
+/* QA / debug handle */
+window.ABS={get state(){return state},openSheet,closeSheets,renderThumb,renderLibrary,
+  get jobs(){return jobs},els:{preview:$('preview'),thumb:$('thumbPreview'),wave:$('wave')}};
+</script>
+</body>
+</html>
