@@ -1734,17 +1734,43 @@ async function groqTranscribe(key,fileBlob,name,lang,signal){
   const data=await res.json();
   return (data&&data.text)||''}
 const CV_TRANSLATE_SYSTEM='You are a professional audiobook translator. Translate the user\'s text faithfully into NATURAL SPOKEN-STYLE Burmese (Myanmar) suitable for audiobook narration: use everyday spoken forms instead of stiff written forms, keep all names and terms consistent, write numbers as Burmese words where natural, and preserve paragraph breaks. Output ONLY the Burmese translation — no commentary, no notes, no original text.';
-async function groqTranslate(key,text,signal){
+async function groqTranslateOnce(key,model,text,signal){
   const res=await fetch('https://api.groq.com/openai/v1/chat/completions',
     {method:'POST',headers:Object.assign({'Content-Type':'application/json'},groqHeaders(key)),
-     body:JSON.stringify({model:'llama-3.3-70b-versatile',temperature:0.3,
+     body:JSON.stringify({model:model,temperature:0.3,
        messages:[{role:'system',content:CV_TRANSLATE_SYSTEM},{role:'user',content:text}]}),
      signal});
-  if(!res.ok)throw new Error(await groqErrText(res));
+  if(!res.ok){const d=await res.json().catch(()=>({}));
+    const e=new Error((d.error&&(d.error.message||d.error.code))||('Groq error '+res.status));
+    e.status=res.status;if(d.error&&d.error.code)e.code=d.error.code;throw e}
   const data=await res.json();
   const out=data&&data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content;
   if(!out)throw new Error('ဘာသာပြန် ပြန်မရပါ — ထပ်ကြိုးစားပါ');
   return out.trim()}
+/* Translation model chain: some Groq accounts have no access to the first-choice
+   model (model_not_found) — demote it and fall back; the working model is
+   remembered in localStorage and tried first on the next job. Only model-missing
+   errors switch models; 429/auth/network errors surface as-is. */
+const LS_GROQ_MODEL='abs_groq_model';
+const GROQ_TRANSLATE_MODELS=['llama-3.3-70b-versatile','openai/gpt-oss-120b'];
+let cvJobModel=null;
+function cvBeginJob(){cvJobModel=null}
+function groqModelOrder(){
+  let saved='';try{saved=(localStorage.getItem(LS_GROQ_MODEL)||'').trim()}catch(e){}
+  const order=GROQ_TRANSLATE_MODELS.slice();const i=order.indexOf(saved);
+  if(i>0){order.splice(i,1);order.unshift(saved)}
+  return order}
+function isModelMissingErr(e){return !!e&&(e.status===404||
+  /model_not_found|model not found/i.test((e.message||'')+' '+(e.code||'')))}
+async function groqTranslate(key,text,signal){
+  if(cvJobModel)return groqTranslateOnce(key,cvJobModel,text,signal);
+  const order=groqModelOrder();let lastErr=null;
+  for(const m of order){
+    try{const out=await groqTranslateOnce(key,m,text,signal);
+      cvJobModel=m;try{localStorage.setItem(LS_GROQ_MODEL,m)}catch(e){}
+      return out}
+    catch(e){lastErr=e;if(!isModelMissingErr(e))throw e}}
+  throw lastErr}
 function splitLongText(text,max){const out=[];let rest=(text||'').trim();
   while(rest.length>max){let cut=-1;
     for(const sep of ['\n\n','\n','။ ','. ','! ','? ','၊ ',' ']){const i=rest.lastIndexOf(sep,max);if(i>max*0.35){cut=i+sep.length;break}}
@@ -1807,6 +1833,7 @@ $('btnCvStart').addEventListener('click',async()=>{
       showNotice('အသံဖိုင် အရင် ရွေးပါ','err');return}
     blob=cvFile}
   $('cvSrcErr').classList.remove('show');
+  cvBeginJob();
   cvAbort=('AbortController' in window)?new AbortController():null;
   const signal=cvAbort?cvAbort.signal:undefined;
   loadCancelFn=()=>{if(cvAbort)cvAbort.abort()};
@@ -1857,7 +1884,7 @@ window.ABS={get state(){return state},openSheet,closeSheets,renderThumb,renderLi
   get jobs(){return jobs},els:{preview:$('preview'),thumb:$('thumbPreview'),wave:$('wave')},
   geminiKeyList,geminiKeySlots,geminiCall,narrEngine,cvSource,cvLang,shrinkFormat,
   splitTtsText,splitLongText,pollinationsUrl,groqTranscribe,groqTranslate,
-  isMp4Family,shrinkRoute,cvSegRoute,segPlan,segProgressText,concatBlobs,
+  isMp4Family,shrinkRoute,cvSegRoute,segPlan,segProgressText,concatBlobs,cvBeginJob,
   shrinkSegNotice,decodeFailMsg,mp4Available,mp4ProbeDuration,SEG_WIN_SEC,
   get session(){return sbSession},set session(v){sbSession=v}};
 </script>
