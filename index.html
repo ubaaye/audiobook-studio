@@ -127,6 +127,14 @@ canvas#thumbPreview{width:100%;aspect-ratio:16/9;display:block;border-radius:12p
 .jobitem,.projitem{padding:11px 12px;border-radius:13px;background:rgba(201,210,224,.06);border:1px solid var(--glassline);margin-bottom:9px}
 .jobitem .t,.projitem .t{font-size:13.5px;font-weight:700;line-height:1.35}
 .jobitem .m,.projitem .m{font-size:11.5px;color:var(--mut);margin-top:2px;line-height:1.5}
+.jobitem .acts{display:flex;gap:7px;margin-top:9px}
+.jobbtn{flex:0 0 auto;padding:6px 12px;border-radius:9px;border:1px solid var(--glassline);background:rgba(201,210,224,.10);color:var(--txt);font:inherit;font-size:12.5px;font-weight:700;cursor:pointer}
+.jobbtn:active{transform:scale(.97)}
+#btnCancelExport{margin-top:14px}
+.voicerow{justify-content:space-between;text-align:left}
+.voicerow .vdesc{color:var(--mut);font-size:12px;font-weight:400}
+.voicerow.on{border-color:var(--accent2);background:rgba(201,210,224,.16)}
+#ttsVoiceList{display:grid;gap:8px}
 .projitem .acts{display:flex;gap:7px;margin-top:9px}
 .projitem .acts .btn{flex:1}
 .empty-note{color:var(--dim);font-size:13px;text-align:center;padding:18px 6px;line-height:1.6}
@@ -192,6 +200,7 @@ footer.note{color:var(--dim);font-size:11px;text-align:center;line-height:1.6;ma
       <button class="btn" id="btnPickAudio">🎙 အသံဖိုင် ရွေးမယ်</button>
       <button class="btn" id="btnPickCover">🖼 မျက်နှာဖုံး ရွေးမယ်</button>
       <button class="btn wide" id="btnAiCover">✦ AI မျက်နှာဖုံး ဖန်တီးမယ်</button>
+      <button class="btn wide" data-open-sheet="sheetNarrate">🎙️ အသံ ထုတ်မယ် (စာသား မှ)</button>
     </div>
   </section>
 
@@ -207,12 +216,21 @@ footer.note{color:var(--dim);font-size:11px;text-align:center;line-height:1.6;ma
     </div>
   </section>
 
+  <section class="card glass">
+    <h2>ကိရိယာ</h2>
+    <div class="rowbtns">
+      <button class="btn wide" data-open-sheet="sheetShrink">📉 ဖိုင် ချုံ့မယ်</button>
+    </div>
+    <p style="font-size:12px;color:var(--mut);line-height:1.6;margin:9px 0 0">အသံဖိုင်ကြီးများကို Telegram bot ဆီ ပို့နိုင်အောင် 20 MB အောက် ချုံ့ပေးသော ကိရိယာ</p>
+  </section>
+
   <footer class="note">အရာအားလုံး Browser ထဲတွင်သာ လုပ်ဆောင်သည် · အခမဲ့ · Project များ ဤဖုန်း/ Browser ထဲတွင် သိမ်းထားသည်</footer>
 </div>
 
 <input type="file" id="fileAudio" accept="audio/*" class="hidden">
 <input type="file" id="fileCover" accept="image/*" class="hidden">
 <input type="file" id="fileBgVideo" accept="video/*" class="hidden">
+<input type="file" id="fileShrink" accept="audio/*" class="hidden">
 <audio id="audioEl" preload="metadata" class="hidden"></audio>
 <video id="bgVideoEl" loop muted playsinline class="hidden"></video>
 
@@ -286,7 +304,7 @@ footer.note{color:var(--dim);font-size:11px;text-align:center;line-height:1.6;ma
   <div class="grab"></div>
   <div class="shead"><h3>⬆ Video ထုတ်ရန်</h3><button class="xbtn" data-close-sheet>✕</button></div>
   <div class="sbody">
-    <p style="font-size:12.5px;color:var(--mut);line-height:1.6;margin:2px 0 4px">1920×1080 · အသံဖိုင် အပြည့်အစုံ ပါဝင်မည် · ဖိုင်အမည်သည် ခေါင်းစဉ် အတိုင်း ဖြစ်မည် · တစ်ခုပြီးမှ တစ်ခု အစဉ်လိုက် (FIFO) ထုတ်ပေးမည်</p>
+    <p style="font-size:12.5px;color:var(--mut);line-height:1.6;margin:2px 0 4px">1920×1080 · အသံဖိုင် အပြည့်အစုံ ပါဝင်မည် · ဖိုင်အမည်သည် ခေါင်းစဉ် အတိုင်း ဖြစ်မည် · တစ်ခုပြီးမှ တစ်ခု အစဉ်လိုက် (FIFO) ထုတ်ပေးမည် · Browser က WebCodecs ရလျှင် ⚡ Fast ဖြင့် အချိန်တိုတို ထုတ်မည် (မရလျှင် ပုံမှန် Real-time)</p>
     <label class="fl">ထုတ်မည့် အရည်အသွေး</label>
     <div class="chips" id="exportFmtChips">
       <button class="chip on" data-fmt="auto">Auto (MP4 ရလျှင် MP4)</button>
@@ -323,7 +341,7 @@ footer.note{color:var(--dim);font-size:11px;text-align:center;line-height:1.6;ma
   <div class="grab"></div>
   <div class="shead"><h3>⚙ Settings</h3><button class="xbtn" data-close-sheet>✕</button></div>
   <div class="sbody">
-    <label class="fl">Gemini API Key (AI မျက်နှာဖုံး အတွက်)</label>
+    <label class="fl">Gemini API Key (AI မျက်နှာဖုံး နှင့် အသံ ထုတ်ရန်)</label>
     <input class="inp" id="setGeminiKey" type="password" placeholder="AIza…" autocomplete="off">
     <div class="err-text" id="setGeminiKeyErr">AI မျက်နှာဖုံး သုံးရန် Gemini API Key လိုပါတယ် — Google AI Studio မှာ အခမဲ့ ရယူပြီး ဒီနေရာမှာ ထည့်ပါ။</div>
     <p style="font-size:11.5px;color:var(--mut);line-height:1.6;margin:7px 0 0">Key ကို ဤ Browser ၏ localStorage ထဲတွင်သာ သိမ်းသည် — မည်သည့် server မှ မပို့ပါ။</p>
@@ -350,11 +368,61 @@ footer.note{color:var(--dim);font-size:11px;text-align:center;line-height:1.6;ma
   </div>
 </div>
 
+<!-- Narration (text → speech) sheet -->
+<div class="sheet" id="sheetNarrate" role="dialog" aria-label="Narration">
+  <div class="grab"></div>
+  <div class="shead"><h3>🎙️ အသံ ထုတ်မယ်</h3><button class="xbtn" data-close-sheet>✕</button></div>
+  <div class="sbody">
+    <label class="fl">ဇာတ်လမ်း / ပြောမည့် စာသား</label>
+    <textarea class="inp" id="ttsText" rows="7" placeholder="ပြောစေချင်သော စာသားကို ဒီမှာ ထည့်ပါ…"></textarea>
+    <div style="font-size:12px;color:var(--mut);margin-top:5px"><span id="ttsCount">0</span> လုံး · စာရှည်လျှင် အပိုင်း ခွဲ၍ ထုတ်ပေးမည်</div>
+    <div class="err-text" id="ttsTextErr">စာသား ထည့်ရန် လိုပါတယ် — ပြောစေချင်သော စာသား အရင် ရေးပါ။</div>
+    <label class="fl">အသံ (Voice)</label>
+    <button class="btn wide" id="btnTtsVoice" data-open-sheet="sheetTtsVoices">Kore · တည်ကြည်</button>
+    <label class="fl">Tone / Style (မထည့်လည်း ရ)</label>
+    <input class="inp" id="ttsStyle" placeholder="ဥပမာ — warm storytelling tone" autocomplete="off">
+    <div style="height:14px"></div>
+    <button class="btn primary wide" id="btnGenTts">🎙️ အသံ ထုတ်မယ်</button>
+    <button class="btn wide hidden" id="btnDlTts" style="margin-top:9px">⬇ ထုတ်ထားသော အသံ (WAV) ဒေါင်းလုဒ်</button>
+    <p style="font-size:11.5px;color:var(--mut);line-height:1.6;margin:9px 0 0">ကိုယ်ပိုင် Gemini Key ဖြင့် Google သို့ တိုက်ရိုက် ချိတ်ဆက်သည်။ Gemini အခမဲ့ အဆင့်မှာ တစ်နေ့ ၁၀–၁၅ ကြိမ်ခန့်သာ ရသည် — စာသား ရှည်လျှင် အပိုင်း များများ ခွဲရသဖြင့် ကြိမ် အရေအတွက် ကုန်နိုင်သည်။ Key မရှိသေးလျှင် Settings မှာ ထည့်ပါ။</p>
+  </div>
+</div>
+
+<!-- TTS voice picker sheet -->
+<div class="sheet" id="sheetTtsVoices" role="dialog" aria-label="TTS Voices">
+  <div class="grab"></div>
+  <div class="shead"><h3>အသံ ရွေးမယ်</h3><button class="xbtn" data-close-sheet>✕</button></div>
+  <div class="sbody"><div id="ttsVoiceList"></div></div>
+</div>
+
+<!-- Audio shrinker sheet -->
+<div class="sheet" id="sheetShrink" role="dialog" aria-label="Audio Shrinker">
+  <div class="grab"></div>
+  <div class="shead"><h3>📉 ဖိုင် ချုံ့မယ်</h3><button class="xbtn" data-close-sheet>✕</button></div>
+  <div class="sbody">
+    <p style="font-size:12.5px;color:var(--mut);line-height:1.6;margin:2px 0 4px">Telegram bot ဆီ ပို့ရန် အသံဖိုင်ကို 20 MB အောက် ချုံ့ပေးသည် (bot က 20 MB ထက် ကြီးသော ဖိုင် ဒေါင်းလုဒ် မလုပ်နိုင်ပါ)။ အသံကို စကားပြော အတွက် လုံလောက်သော အဆင့် (mono · 24 kHz) ဖြင့် ထိန်းထားသည်။</p>
+    <button class="btn wide" id="btnPickShrink">📁 ချုံ့မည့် အသံဖိုင် ရွေးမယ်</button>
+    <div style="height:10px"></div>
+    <div id="shrinkMeta" style="font-size:13px;line-height:1.6">ဖိုင် မရွေးရသေးပါ</div>
+    <div id="shrinkPlan" style="font-size:12.5px;color:var(--mut);line-height:1.6;margin-top:3px"></div>
+    <div style="height:14px"></div>
+    <button class="btn primary wide" id="btnDoShrink">📉 ချုံ့မယ်</button>
+    <div id="shrinkResult" class="hidden" style="margin-top:14px">
+      <div id="shrinkResultMeta" style="font-size:13px;line-height:1.7"></div>
+      <div class="rowbtns" style="margin-top:10px">
+        <button class="btn primary" id="btnDlShrink">⬇ ဒေါင်းလုဒ်</button>
+        <button class="btn" id="btnUseShrink">Project အသံ အဖြစ် သုံးမယ်</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Loading pop-up -->
 <div class="popwrap" id="loadPop"><div class="pop">
   <div class="waveanim"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
   <h3 id="loadTitle">လုပ်နေပါတယ်…</h3>
   <p id="loadMsg">ခဏ စောင့်ပါ</p>
+  <button class="btn wide hidden" id="btnCancelExport">⛔ ရပ်</button>
 </div></div>
 
 <!-- Done pop-up -->
@@ -434,7 +502,7 @@ $('btnLibTop').addEventListener('click',()=>openSheet('sheetLibrary'));
 $('btnSettingsTop').addEventListener('click',()=>openSheet('sheetSettings'));
 function showLoad(t,m){$('loadTitle').textContent=t;$('loadMsg').textContent=m||'ခဏ စောင့်ပါ';$('loadPop').classList.add('show');lockScroll()}
 function setLoadMsg(m){$('loadMsg').textContent=m}
-function hideLoad(){$('loadPop').classList.remove('show');lockScroll()}
+function hideLoad(){$('loadPop').classList.remove('show');$('btnCancelExport').classList.add('hidden');lockScroll()}
 function showDone(t,m){$('doneTitle').textContent=t;$('doneMsg').textContent=m||'';$('donePop').classList.add('show');lockScroll()}
 $('btnDoneClose').addEventListener('click',()=>{$('donePop').classList.remove('show');lockScroll()});
 let noticeTimer=null;
@@ -518,7 +586,7 @@ $('btnGenAiCover').addEventListener('click',async()=>{
   if(!key){closeSheets();openSheet('sheetSettings');const k=$('setGeminiKey');k.classList.add('bad');$('setGeminiKeyErr').classList.add('show');
     showNotice('Gemini API Key လိုပါတယ် — Settings မှာ အရင် ထည့်ပါ','err');return}
   const blob=await opBusy('AI မျက်နှာဖုံး ဖန်တီးနေပါတယ်…',async()=>{
-    const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent',
+    const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent',
       {method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},
        body:JSON.stringify({contents:[{parts:[{text:p.value}]}],generationConfig:{responseModalities:['TEXT','IMAGE']}})});
     const data=await res.json().catch(()=>({}));
@@ -602,7 +670,7 @@ function buildThemeGrid(){const grid=$('themeGrid');grid.innerHTML='';
     grid.appendChild(b)})}
 
 /* ============ preview renderer (also used for export) ============ */
-function drawScene(ctx,w,h,tSec,peaks){
+function drawFrame(ctx,w,h,tSec,peaks,progT){
   paintBackground(ctx,w,h,tSec);
   const S=w/1920; /* scale unit vs 1920x1080 */
   const grad=ctx.createLinearGradient(0,h*0.45,0,h);grad.addColorStop(0,'rgba(4,5,7,0)');grad.addColorStop(1,'rgba(4,5,7,0.55)');
@@ -633,19 +701,19 @@ function drawScene(ctx,w,h,tSec,peaks){
   ctx.restore();
   /* waveform strip + progress */
   const wy=h*0.865,wh=h*0.075;const N=(peaks&&peaks.length)||64;const bw=w*0.86/N;
-  const dur=audioEl.duration||state.audioDur||0;const prog=dur?clamp(audioEl.currentTime/dur,0,1):0;
+  const dur=audioEl.duration||state.audioDur||0;const curT=(typeof progT==='number')?progT:(audioEl.currentTime||0);const prog=dur?clamp(curT/dur,0,1):0;
   for(let i=0;i<N;i++){const p=peaks&&peaks.length?peaks[i]:0.2+0.14*Math.sin(i*0.6+tSec*2);
     const bh=Math.max(2,p*wh);const x=w*0.07+i*bw+bw*0.2;
     ctx.fillStyle=(i/N<=prog)?'rgba(238,242,248,0.95)':'rgba(201,210,224,0.4)';
     ctx.fillRect(x,wy+(wh-bh)/2,Math.max(1.4,bw*0.6),bh)}
   ctx.fillStyle='rgba(238,242,248,0.85)';ctx.font='400 '+(26*(w/960)*0.5+8)+'px Padauk, sans-serif';ctx.textAlign='right';
-  ctx.fillText(fmtT(audioEl.currentTime||0)+' / '+fmtT(dur),w*0.93,wy-10*(w/960)*0.5)}
+  ctx.fillText(fmtT(curT)+' / '+fmtT(dur),w*0.93,wy-10*(w/960)*0.5)}
 function fitFillText(ctx,text,x,y,maxW){let s=text;if(ctx.measureText(s).width>maxW){while(s.length>1&&ctx.measureText(s+'…').width>maxW)s=s.slice(0,-1);s+='…'}ctx.fillText(s,x,y)}
 function hexA(hex,a){if(!hex||hex[0]!=='#'||hex.length<7)return hex;const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return 'rgba('+r+','+g+','+b+','+a+')'}
 const preview=$('preview');const pctx=preview.getContext&&preview.getContext('2d');
 let lastFrame=performance.now();
 function drawPreview(now){const dt=Math.min(0.05,(now-lastFrame)/1000);lastFrame=now;bgPingPong(dt);
-  if(pctx)drawScene(pctx,preview.width,preview.height,now/1000,RT.peaks)}
+  if(pctx)drawFrame(pctx,preview.width,preview.height,now/1000,RT.peaks)}
 function loop(now){drawPreview(now);if(window.requestAnimationFrame)requestAnimationFrame(loop)}
 if(window.requestAnimationFrame)requestAnimationFrame(loop);
 </script>
@@ -749,12 +817,19 @@ $('btnDownloadThumb').addEventListener('click',async()=>{
 function fileBase(){return [state.title1,state.title2].filter(Boolean).join(' ').trim().replace(/[\\/:*?"<>|]/g,'').replace(/\s+/g,' ').slice(0,80)}
 
 /* ============ Video export (FIFO queue) ============ */
-const jobs=[];let queueRunning=false;
+const jobs=[];let queueRunning=false,currentJob=null;
 function renderJobs(){const box=$('exportJobs');
   if(!jobs.length){box.innerHTML='<div class="empty-note">Queue ထဲတွင် မရှိသေးပါ</div>';return}
   box.innerHTML='';jobs.forEach(j=>{const d=document.createElement('div');d.className='jobitem';
-    d.innerHTML='<div class="t">'+esc(j.title)+'</div><div class="m">'+esc(j.status)+'</div><div class="prog"><i style="width:'+Math.round(j.progress*100)+'%"></i></div>';
+    let acts='';
+    if(j===currentJob)acts='<div class="acts"><button class="jobbtn" data-cancel-job="'+j.id+'">⛔ ရပ်</button></div>';
+    else if(!j.cancelled)acts='<div class="acts"><button class="jobbtn" data-remove-job="'+j.id+'">✕ ဖယ်မယ်</button></div>';
+    d.innerHTML='<div class="t">'+esc(j.title)+'</div><div class="m">'+esc(j.status)+'</div><div class="prog"><i style="width:'+Math.round(j.progress*100)+'%"></i></div>'+acts;
     box.appendChild(d)})}
+$('exportJobs').addEventListener('click',e=>{
+  const cb=e.target.closest('[data-cancel-job]');if(cb){cancelExport();return}
+  const rb=e.target.closest('[data-remove-job]');if(rb){const i=jobs.findIndex(j=>j.id===rb.dataset.removeJob);
+    if(i>=0&&jobs[i]!==currentJob){jobs.splice(i,1);renderJobs();showNotice('Queue မှ ဖယ်လိုက်ပါပြီ','ok')}}});
 function pickMime(fmt){const cands=fmt==='webm'
     ?['video/webm;codecs=vp9,opus','video/webm']
     :['video/mp4;codecs=avc1.640028,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm'];
@@ -774,18 +849,109 @@ $('btnQueueExport').addEventListener('click',async()=>{
   jobs.push(job);renderJobs();showNotice('Queue ထဲ ထည့်ပြီးပါပြီ — အစဉ်လိုက် ထုတ်ပေးပါမည်','ok');
   processQueue()});
 async function processQueue(){if(queueRunning)return;queueRunning=true;
-  while(jobs.length){const job=jobs[0];
-    try{await runExport(job);job.status='✅ ပြီးပါပြီ';job.progress=1;renderJobs();
-      showDone('✅ Video ရပါပြီ','"'+job.title+'" ဒေါင်းလုဒ် စတင်ပါပြီ')}
-    catch(e){job.status='❌ မအောင်မြင် — '+(e&&e.message?e.message:e);renderJobs();showNotice('Export မအောင်မြင်ပါ — '+job.status,'err')}
-    jobs.shift();renderJobs();await new Promise(r=>setTimeout(r,300))}
+  while(jobs.length){const job=jobs[0];currentJob=job;
+    try{await runExport(job);job.status='✅ ပြီးပါပြီ'+(job.mode?' · '+job.mode:'');job.progress=1;renderJobs();
+      showDone('✅ Video ရပါပြီ','"'+job.title+'" ဒေါင်းလုဒ် စတင်ပါပြီ'+(job.mode?' — '+job.mode:''))}
+    catch(e){if(job.cancelled||(e&&e.cancelled)){job.status='⛔ ရပ်လိုက်ပြီ';renderJobs();
+        showNotice('⛔ ရပ်လိုက်ပြီ — "'+job.title+'" export ရပ်လိုက်ပါပြီ၊ ဖိုင် မထုတ်ပါ','ok')}
+      else{job.status='❌ မအောင်မြင် — '+(e&&e.message?e.message:e);renderJobs();showNotice('Export မအောင်မြင်ပါ — '+job.status,'err')}}
+    currentJob=null;jobs.shift();renderJobs();await new Promise(r=>setTimeout(r,300))}
   queueRunning=false}
 let AC=null,mediaSrc=null,gainNode=null;
 function ensureAudioGraph(){const ACtx=window.AudioContext||window.webkitAudioContext;if(!ACtx)return null;
   if(!AC){AC=new ACtx();mediaSrc=AC.createMediaElementSource(audioEl);gainNode=AC.createGain();
     mediaSrc.connect(gainNode);gainNode.connect(AC.destination)}
   return AC}
-async function runExport(job){job.status='ပြင်ဆင်နေသည်…';renderJobs();
+/* ---- export cancel machinery (shared: real-time + fast + narration) ---- */
+let activeExport=null,loadCancelFn=null;
+function cancelErr(){const e=new Error('CANCELLED');e.cancelled=true;return e}
+function cancelExport(){if(!activeExport||activeExport.cancelled)return;activeExport.cancelled=true;
+  if(currentJob){currentJob.cancelled=true;currentJob.status='⛔ ရပ်နေသည်…';renderJobs()}
+  if(activeExport.requestCancel)activeExport.requestCancel()}
+$('btnCancelExport').addEventListener('click',()=>{if(loadCancelFn)loadCancelFn();else cancelExport()});
+
+/* ---- export dispatcher: fast (WebCodecs) when possible, else real-time ---- */
+async function runExport(job){
+  if(job.snapshot.hasBgVideo){job.mode='custom background — real-time export';await runExportRT(job);return}
+  if(('VideoEncoder' in window)&&('AudioEncoder' in window)){
+    try{await runFastExport(job);job.mode='⚡ Fast export (WebCodecs)';return}
+    catch(e){if(e&&e.cancelled)throw e;job.mode='🎬 Real-time export (Fast မရပါ)'}}
+  else job.mode='🎬 Real-time export';
+  await runExportRT(job)}
+
+/* ---- fast export: WebCodecs + mp4-muxer, faster than real-time ---- */
+let muxerMod=null;
+async function loadMuxer(){if(muxerMod)return muxerMod;
+  try{muxerMod=await import('https://cdn.jsdelivr.net/npm/mp4-muxer@5.2.1/+esm')}
+  catch(e){muxerMod=await import('https://unpkg.com/mp4-muxer@5.2.1/build/mp4-muxer.mjs')}
+  if(!muxerMod||!muxerMod.Muxer||!muxerMod.ArrayBufferTarget)throw new Error('mp4-muxer မရပါ');
+  return muxerMod}
+async function runFastExport(job){job.status='ပြင်ဆင်နေသည်… (Fast)';renderJobs();
+  const mod=await loadMuxer();
+  const blob=await idb.get('audio:'+job.snapshot.id).catch(()=>null);
+  if(!blob)throw new Error('အသံဖိုင် မတွေ့ပါ');
+  const ACx=window.AudioContext||window.webkitAudioContext;if(!ACx)throw new Error('WebAudio မရပါ');
+  const dac=new ACx({sampleRate:48000});
+  let buf;try{buf=await dac.decodeAudioData(await blob.arrayBuffer())}finally{if(dac.close)dac.close()}
+  const SR=buf.sampleRate,CH=2;
+  let vCfg=null;const vCands=['avc1.640033','avc1.640028','avc1.4d4028','avc1.42001f'];
+  for(const c of vCands){const cfg={codec:c,width:1920,height:1080,bitrate:8_000_000,framerate:30};
+    try{const s=await VideoEncoder.isConfigSupported(cfg);if(s&&s.supported){vCfg=s.config||cfg;break}}catch(e){}}
+  if(!vCfg)throw new Error('H.264 encoder မရပါ');
+  const aCfg={codec:'mp4a.40.2',sampleRate:SR,numberOfChannels:CH,bitrate:128_000};
+  const aSup=await AudioEncoder.isConfigSupported(aCfg).catch(()=>null);
+  if(!aSup||!aSup.supported)throw new Error('AAC encoder မရပါ');
+  const muxer=new mod.Muxer({target:new mod.ArrayBufferTarget(),
+    video:{codec:'avc',width:1920,height:1080},audio:{codec:'aac',sampleRate:SR,numberOfChannels:CH},
+    fastStart:'in-memory',firstTimestampBehavior:'offset'});
+  let encErr=null;
+  const vEnc=new VideoEncoder({output:(chunk,meta)=>muxer.addVideoChunk(chunk,meta),error:e=>{encErr=encErr||e}});
+  vEnc.configure(vCfg);
+  const aEnc=new AudioEncoder({output:(chunk,meta)=>muxer.addAudioChunk(chunk,meta),error:e=>{encErr=encErr||e}});
+  aEnc.configure(aSup.config||aCfg);
+  const ae={job,kind:'fast',cancelled:false,requestCancel:()=>{try{vEnc.close()}catch(e){}try{aEnc.close()}catch(e){}}};
+  const savedState=state;state=Object.assign(defaults(),job.snapshot);
+  activeExport=ae;RT.exporting=true;job.status='⚡ Fast Render လုပ်နေသည်…';renderJobs();
+  showLoad('⚡ Fast Video ထုတ်နေပါတယ်…','0% — "'+job.title+'"');
+  $('btnCancelExport').classList.remove('hidden');
+  const cv=document.createElement('canvas');cv.width=1920;cv.height=1080;
+  const cx=cv.getContext&&cv.getContext('2d');
+  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+  try{
+    if(!cx)throw new Error('Canvas မရပါ');
+    const ch0=buf.getChannelData(0),ch1=buf.numberOfChannels>1?buf.getChannelData(1):ch0;
+    const CPF=1024,totalSamples=ch0.length;
+    for(let off=0;off<totalSamples;off+=CPF){
+      if(ae.cancelled)throw cancelErr();if(encErr)throw encErr;
+      const nf=Math.min(CPF,totalSamples-off);
+      while(aEnc.encodeQueueSize>8){await sleep(4);if(ae.cancelled)throw cancelErr()}
+      const data=new Float32Array(nf*CH);
+      data.set(ch0.subarray(off,off+nf),0);data.set(ch1.subarray(off,off+nf),nf);
+      const ad=new AudioData({format:'f32-planar',sampleRate:SR,numberOfFrames:nf,numberOfChannels:CH,
+        timestamp:Math.round(off/SR*1e6),data:data.buffer});
+      aEnc.encode(ad);ad.close()}
+    await aEnc.flush();if(ae.cancelled)throw cancelErr();if(encErr)throw encErr;
+    const fps=30,dur=buf.duration,total=Math.max(1,Math.ceil(dur*fps));
+    for(let f=0;f<total;f++){
+      if(ae.cancelled)throw cancelErr();if(encErr)throw encErr;
+      const t=f/fps;drawFrame(cx,1920,1080,t,RT.peaks,t);
+      const vf=new VideoFrame(cv,{timestamp:Math.round(f*1e6/fps),duration:Math.round(1e6/fps)});
+      while(vEnc.encodeQueueSize>8){await sleep(4);if(ae.cancelled){vf.close();throw cancelErr()}}
+      vEnc.encode(vf,{keyFrame:f%(fps*5)===0});vf.close();
+      job.progress=(f+1)/total;
+      if(f%10===0){setLoadMsg(Math.round(job.progress*100)+'% — "'+job.title+'"');renderJobs()}
+      if(f%24===0)await sleep(0)}
+    await vEnc.flush();if(ae.cancelled)throw cancelErr();if(encErr)throw encErr;
+  }finally{try{vEnc.close()}catch(e){}try{aEnc.close()}catch(e){}
+    if(activeExport===ae)activeExport=null;
+    state=savedState;RT.exporting=false;hideLoad();refreshAll()}
+  muxer.finalize();
+  const outBlob=new Blob([muxer.target.buffer],{type:'video/mp4'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(outBlob);
+  a.download=job.title+'.mp4';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),6000);
+  state.videoExported=true;saveMeta()}
+
+async function runExportRT(job){job.status='ပြင်ဆင်နေသည်…';renderJobs();
   const cv=document.createElement('canvas');cv.width=1920;cv.height=1080;
   const cx=cv.getContext&&cv.getContext('2d');if(!cx)throw new Error('Canvas မရပါ');
   const ac=ensureAudioGraph();if(!ac)throw new Error('WebAudio မရပါ');
@@ -797,21 +963,33 @@ async function runExport(job){job.status='ပြင်ဆင်နေသည်�
   const rec=new MediaRecorder(out,mime?{mimeType:mime,videoBitsPerSecond:10_000_000,audioBitsPerSecond:192_000}:{videoBitsPerSecond:10_000_000});
   const chunks=[];rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
   const stopped=new Promise(res=>{rec.onstop=res});
+  const ae={job,kind:'rt',cancelled:false,requestCancel:null};
+  let rejectWait=null;
+  ae.requestCancel=()=>{try{audioEl.pause()}catch(e){}try{if(rec.state!=='inactive')rec.stop()}catch(e){}
+    if(rejectWait)rejectWait(cancelErr())};
   const savedState=state;state=Object.assign(defaults(),job.snapshot);
-  const wasPlaying=!audioEl.paused;audioEl.pause();audioEl.currentTime=0;
+  audioEl.pause();audioEl.currentTime=0;
+  activeExport=ae;
   RT.exporting=true;job.status='🎬 Render လုပ်နေသည်…';renderJobs();
   showLoad('Video ထုတ်နေပါတယ်…','0% — "'+job.title+'"');
-  let rafId=null;const t0=performance.now();
-  const drawLoop=()=>{drawScene(cx,1920,1080,performance.now()/1000,RT.peaks);
-    const d=audioEl.duration||0;job.progress=d?clamp(audioEl.currentTime/d,0,1):0;
+  $('btnCancelExport').classList.remove('hidden');
+  let rafId=null;
+  const drawLoop=()=>{const ct=audioEl.currentTime||0;drawFrame(cx,1920,1080,ct,RT.peaks,ct);
+    const d=audioEl.duration||0;job.progress=d?clamp(ct/d,0,1):0;
     if(Math.floor(job.progress*100)%2===0){setLoadMsg(Math.round(job.progress*100)+'% — "'+job.title+'"');renderJobs()}
     rafId=requestAnimationFrame(drawLoop)};
   try{rec.start(250);await audioEl.play();drawLoop();
-    await new Promise((res,rej)=>{audioEl.addEventListener('ended',res,{once:true});
+    await new Promise((res,rej)=>{rejectWait=rej;audioEl.addEventListener('ended',res,{once:true});
       setTimeout(()=>rej(new Error('အချိန် ကျော်သွားသည်')),((audioEl.duration||0)+30)*1000)});
-    await new Promise(r=>setTimeout(r,350));rec.stop();await stopped}
+    await new Promise(r=>setTimeout(r,350));
+    if(ae.cancelled||job.cancelled)throw cancelErr();
+    if(rec.state!=='inactive')rec.stop();await stopped;
+    if(ae.cancelled||job.cancelled)throw cancelErr()}
   finally{cancelAnimationFrame(rafId);audioEl.pause();gainNode.disconnect(aDest);
+    vStream.getVideoTracks().forEach(t=>{try{t.stop()}catch(e){}});
+    if(activeExport===ae)activeExport=null;
     state=savedState;RT.exporting=false;hideLoad();refreshAll()}
+  if(ae.cancelled||job.cancelled){chunks.length=0;throw cancelErr()}
   const ext=(mime&&mime.indexOf('mp4')>=0)?'mp4':'webm';
   const blob=new Blob(chunks,{type:mime||'video/webm'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
@@ -882,6 +1060,194 @@ $('btnReset').addEventListener('click',async()=>{
   $('audioName').textContent='အသံဖိုင် မရွေးရသေးပါ';$('audioMeta').textContent='Audiobook အသံဖိုင် (MP3, M4A, WAV…) ထည့်ပါ';
   $('bgVideoMeta').textContent='Video မရွေးရသေးပါ';$('btnClearBgVideo').classList.add('hidden');
   saveMeta();refreshAll();showDone('✅ Reset ပြီးပါပြီ','Project အသစ် ပြန်စနိုင်ပါပြီ')});
+
+/* ============ Narration: text → speech (visitor's own Gemini key) ============ */
+const TTS_VOICES=[['Kore','တည်ကြည်'],['Achird','ဖော်ရွေ'],['Algenib','ကြမ်းတမ်း'],['Algieba','ချောမွေ'],['Alnilam','မာကျော'],['Aoede','လေညင်း'],['Autonoe','တောက်ပ'],['Callirrhoe','သာယာ'],['Charon','ရှင်းလင်း'],['Despina','ချောမွေ'],['Enceladus','လေသံပါ'],['Erinome','ကြည်လင်'],['Fenrir','စိတ်လှုပ်ရှား'],['Gacrux','ရင့်ကျက်'],['Iapetus','ကြည်လင်'],['Laomedeia','တက်ကြွ'],['Leda','နုပျို'],['Orus','မာကျော'],['Pulcherrima','တက်ကြွ'],['Puck','ရွှင်လန်း'],['Rasalgethi','ရှင်းလင်း'],['Sadachbia','ရွှင်လန်း'],['Sadaltager','ပညာရှင်'],['Schedar','ညီညွတ်'],['Sulafat','နွေးထွေး'],['Umbriel','သာယာ'],['Vindemiatrix','ညင်သာ'],['Zephyr','တောက်ပ'],['Zubenelgenubi','သာမန်'],['Achernar','ပျော့ပျောင်း']];
+let ttsVoice='Kore',ttsCancel=false,lastTtsUrl=null;
+function renderTtsVoices(){const box=$('ttsVoiceList');if(!box)return;box.innerHTML='';
+  TTS_VOICES.forEach(v=>{const b=document.createElement('button');b.className='btn wide voicerow'+(ttsVoice===v[0]?' on':'');
+    const s1=document.createElement('span');s1.textContent=v[0];
+    const s2=document.createElement('span');s2.className='vdesc';s2.textContent=v[1];
+    b.appendChild(s1);b.appendChild(s2);
+    b.addEventListener('click',()=>{ttsVoice=v[0];$('btnTtsVoice').textContent=v[0]+' · '+v[1];renderTtsVoices();openSheet('sheetNarrate')});
+    box.appendChild(b)})}
+renderTtsVoices();
+$('ttsText').addEventListener('input',e=>{$('ttsCount').textContent=e.target.value.length});
+function splitTtsText(text,max){max=max||550;const out=[];let cur='';
+  const flush=()=>{if(cur.trim())out.push(cur.trim());cur=''};
+  const sents=(text||'').split(/(?<=။)\s*/).filter(s=>s.length);
+  for(const s of sents){
+    if(s.length<=max){if((cur+s).length<=max)cur+=s;else{flush();cur=s}continue}
+    flush();let rest=s;
+    while(rest.length>max){let cut=rest.lastIndexOf('၊',max-1);
+      if(cut<max*0.4)cut=max;else cut=cut+1;
+      out.push(rest.slice(0,cut).trim());rest=rest.slice(cut)}
+    cur=rest}
+  flush();return out}
+async function geminiTtsChunk(key,text,voice){
+  const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash-tts:generateContent',
+    {method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},
+     body:JSON.stringify({contents:[{parts:[{text}]}],generationConfig:{responseModalities:['AUDIO'],
+       speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:voice}}}}})});
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok)throw new Error((data.error&&data.error.message)||('Google error '+res.status));
+  const parts=(((data.candidates||[])[0]||{}).content||{}).parts||[];
+  const ip=parts.find(x=>x.inlineData&&x.inlineData.data);
+  if(!ip)throw new Error('အသံ ပြန်မရပါ — ထပ်ကြိုးစားပါ');
+  const bin=atob(ip.inlineData.data);const arr=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
+  const m=/rate=(\d+)/.exec(ip.inlineData.mimeType||'');
+  return{bytes:arr,rate:m?parseInt(m[1],10):24000}}
+function pcmToWav(pcm,sampleRate){const n=pcm.length;const buf=new ArrayBuffer(44+n);const v=new DataView(buf);
+  const ws=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i))};
+  ws(0,'RIFF');v.setUint32(4,36+n,true);ws(8,'WAVE');ws(12,'fmt ');v.setUint32(16,16,true);
+  v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,sampleRate,true);
+  v.setUint32(28,sampleRate*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);
+  ws(36,'data');v.setUint32(40,n,true);new Uint8Array(buf,44).set(pcm);
+  return new Blob([buf],{type:'audio/wav'})}
+$('btnGenTts').addEventListener('click',async()=>{
+  const ta=$('ttsText');const text=ta.value.trim();
+  if(!text){ta.classList.add('bad');$('ttsTextErr').classList.add('show');ta.focus();return}
+  ta.classList.remove('bad');$('ttsTextErr').classList.remove('show');
+  const key=(localStorage.getItem(LS_K)||'').trim();
+  if(!key){closeSheets();openSheet('sheetSettings');const k=$('setGeminiKey');k.classList.add('bad');$('setGeminiKeyErr').classList.add('show');
+    showNotice('Gemini API Key လိုပါတယ် — Settings မှာ အရင် ထည့်ပါ','err');return}
+  const style=$('ttsStyle').value.trim();
+  const chunks=splitTtsText(text,550);
+  ttsCancel=false;loadCancelFn=()=>{ttsCancel=true};
+  showLoad('🎙️ အသံ ထုတ်နေပါတယ်…','အပိုင်း 1 / '+chunks.length);
+  $('btnCancelExport').classList.remove('hidden');
+  const pcms=[];let sr=24000,err=null;
+  try{for(let i=0;i<chunks.length;i++){if(ttsCancel)break;
+      setLoadMsg('အပိုင်း '+(i+1)+' / '+chunks.length+' — အသံ: '+ttsVoice);
+      const r=await geminiTtsChunk(key,(style?('['+style+'] '):'')+chunks[i],ttsVoice);
+      sr=r.rate;pcms.push(r.bytes);
+      if(i<chunks.length-1)await new Promise(r2=>setTimeout(r2,200))}}
+  catch(e){err=e}
+  loadCancelFn=null;hideLoad();
+  if(err){showNotice('မအောင်မြင်ပါ — '+(err&&err.message?err.message:err),'err');return}
+  if(ttsCancel||!pcms.length){showNotice('⛔ ရပ်လိုက်ပြီ — အသံ မထုတ်ပါ','ok');return}
+  const total=pcms.reduce((a,b)=>a+b.length,0);const all=new Uint8Array(total);let off=0;
+  pcms.forEach(b=>{all.set(b,off);off+=b.length});
+  const wav=pcmToWav(all,sr);const nm=(fileBase()||'Narration')+'.wav';
+  await idb.put('audio:'+state.id,wav);await setAudioBlob(wav,nm);
+  if(lastTtsUrl)URL.revokeObjectURL(lastTtsUrl);lastTtsUrl=URL.createObjectURL(wav);
+  const dl=$('btnDlTts');dl.classList.remove('hidden');
+  dl.onclick=()=>{const a=document.createElement('a');a.href=lastTtsUrl;a.download=nm;a.click()};
+  closeSheets();showDone('✅ အသံ ရပါပြီ','Narration WAV ကို Project ၏ အသံအဖြစ် သတ်မှတ်ပြီးပါပြီ — Export ဖြင့် Video ဆက်ထုတ်နိုင်ပါတယ်')});
+
+/* ============ Audio shrinker — ≤19 MB, for sending to the Telegram bot ============ */
+const SHRINK_SR=24000;
+let shrinkFile=null,shrinkDur=0,shrinkBlob=null,shrinkUrl=null,shrinkCancel=false,shrinkExt='webm';
+function fmtMB(b){return (b/1048576).toFixed(2)+' MB'}
+function pickShrinkBitrate(durSec){const TARGET=19*1048576;
+  for(const kb of [64,48,40,32,24,16]){if(durSec*kb*1000/8<=TARGET)return kb}
+  return 16}
+function shrinkEstBytes(durSec,kb){return durSec*kb*1000/8}
+function probeDuration(file){return new Promise((res,rej)=>{const u=URL.createObjectURL(file);const a=new Audio();
+  a.preload='metadata';
+  a.onloadedmetadata=()=>{const d=a.duration;URL.revokeObjectURL(u);res(d)};
+  a.onerror=()=>{URL.revokeObjectURL(u);rej(new Error('ဖိုင် ဖတ် မရပါ'))};
+  a.src=u})}
+function shrinkNameBase(){if(!shrinkFile)return 'audio';const n=shrinkFile.name||'audio';const i=n.lastIndexOf('.');
+  return (i>0?n.slice(0,i):n).replace(/[\\/:*?"<>|]/g,'')}
+function refreshShrinkUI(){
+  if(!shrinkFile){$('shrinkMeta').textContent='ဖိုင် မရွေးရသေးပါ';$('shrinkPlan').textContent='';return}
+  $('shrinkMeta').textContent=shrinkFile.name+' · '+(shrinkFile.type||'audio')+' · '+fmtMB(shrinkFile.size)+(shrinkDur?' · ကြာချိန် '+fmtT(shrinkDur):' · ကြာချိန် မသိသေးပါ');
+  if(shrinkDur>0){const kb=pickShrinkBitrate(shrinkDur);const est=shrinkEstBytes(shrinkDur,kb);
+    $('shrinkPlan').textContent='ထုတ်မည့် အစီအစဉ်: '+kb+' kbps · mono · 24 kHz → ခန့်မှန်း '+fmtMB(est)+(est>20*1048576?' · ⚠️ 16 kbps နှင့်ပင် 20 MB ကျော်နေပါသည် — အသံကို ပိုင်းခွဲရန် လိုပါမည်':' · ✅ 20 MB အောက် ရပါမည်')}
+  else $('shrinkPlan').textContent='ကြာချိန် မသိရသေးပါ — ချုံ့လိုက်မှ Bitrate ရွေးပေးပါမည်'}
+$('btnPickShrink').addEventListener('click',()=>$('fileShrink').click());
+$('fileShrink').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
+  shrinkFile=f;shrinkBlob=null;$('shrinkResult').classList.add('hidden');
+  shrinkDur=0;try{const d=await probeDuration(f);if(isFinite(d)&&d>0)shrinkDur=d}catch(err){}
+  refreshShrinkUI()});
+let webmMuxerMod=null;
+async function loadWebmMuxer(){if(webmMuxerMod)return webmMuxerMod;
+  try{webmMuxerMod=await import('https://cdn.jsdelivr.net/npm/webm-muxer@5.1.3/+esm')}
+  catch(e){webmMuxerMod=await import('https://unpkg.com/webm-muxer@5.1.3/build/webm-muxer.mjs')}
+  if(!webmMuxerMod||!webmMuxerMod.Muxer||!webmMuxerMod.ArrayBufferTarget)throw new Error('webm-muxer မရပါ');
+  return webmMuxerMod}
+async function encodeShrinkOpus(ch,kb){
+  const cfg={codec:'opus',sampleRate:SHRINK_SR,numberOfChannels:1,bitrate:kb*1000};
+  const sup=await AudioEncoder.isConfigSupported(cfg).catch(()=>null);
+  if(!sup||!sup.supported)throw new Error('Opus encoder မရပါ');
+  const mod=await loadWebmMuxer();
+  const muxer=new mod.Muxer({target:new mod.ArrayBufferTarget(),audio:{codec:'A_OPUS',sampleRate:SHRINK_SR,numberOfChannels:1}});
+  let encErr=null;
+  const enc=new AudioEncoder({output:(c,m)=>muxer.addAudioChunk(c,m),error:e=>{encErr=encErr||e}});
+  enc.configure(sup.config||cfg);
+  const CPF=1024,total=ch.length;const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+  try{for(let off=0;off<total;off+=CPF){
+      if(shrinkCancel)throw cancelErr();if(encErr)throw encErr;
+      const nf=Math.min(CPF,total-off);
+      while(enc.encodeQueueSize>8){await sleep(4);if(shrinkCancel)throw cancelErr()}
+      const data=new Float32Array(nf);data.set(ch.subarray(off,off+nf));
+      const ad=new AudioData({format:'f32-planar',sampleRate:SHRINK_SR,numberOfFrames:nf,numberOfChannels:1,
+        timestamp:Math.round(off/SHRINK_SR*1e6),data:data.buffer});
+      enc.encode(ad);ad.close();
+      if(off%(CPF*128)===0)setLoadMsg('Encode (Opus) — '+Math.round(off/total*100)+'%')}
+    await enc.flush();if(shrinkCancel)throw cancelErr();if(encErr)throw encErr;
+  }finally{try{enc.close()}catch(e){}}
+  muxer.finalize();return new Blob([muxer.target.buffer],{type:'audio/webm'})}
+let lameLib=null;
+async function loadLame(){if(lameLib)return lameLib;
+  try{const m=await import('https://cdn.jsdelivr.net/npm/lamejs@1.2.1/+esm');lameLib=m.default||m}
+  catch(e){await import('https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js');lameLib=window.lamejs}
+  if(!lameLib||!lameLib.Mp3Encoder)throw new Error('lamejs မရပါ');
+  return lameLib}
+async function encodeShrinkMp3(ch,kb){const L=await loadLame();
+  const enc=new L.Mp3Encoder(1,SHRINK_SR,kb);const parts=[];const BLK=1152;
+  for(let off=0;off<ch.length;off+=BLK){
+    if(shrinkCancel)throw cancelErr();
+    const n=Math.min(BLK,ch.length-off);const i16=new Int16Array(n);
+    for(let i=0;i<n;i++){const v=Math.max(-1,Math.min(1,ch[off+i]));i16[i]=v<0?v*0x8000:v*0x7FFF}
+    const d=enc.encodeBuffer(i16);if(d&&d.length)parts.push(d);
+    if(off%(BLK*512)===0)setLoadMsg('Encode (MP3) — '+Math.round(off/ch.length*100)+'%')}
+  const end=enc.flush();if(end&&end.length)parts.push(end);
+  return new Blob(parts,{type:'audio/mpeg'})}
+$('btnDoShrink').addEventListener('click',async()=>{
+  if(!shrinkFile){showNotice('ချုံ့မည့် အသံဖိုင် အရင် ရွေးပါ — "📁 ဖိုင် ရွေးမယ်" ကို နှိပ်ပါ','err');return}
+  shrinkCancel=false;loadCancelFn=()=>{shrinkCancel=true};
+  showLoad('📉 ဖိုင် ချုံ့နေပါတယ်…','ဖိုင် ဖတ်နေသည်…');
+  $('btnCancelExport').classList.remove('hidden');
+  let err=null,result=null;
+  try{
+    const ACx=window.AudioContext||window.webkitAudioContext;if(!ACx)throw new Error('WebAudio မရပါ');
+    const dac=new ACx();
+    let buf;try{buf=await dac.decodeAudioData(await shrinkFile.arrayBuffer())}finally{if(dac.close)dac.close()}
+    if(shrinkCancel)throw cancelErr();
+    shrinkDur=buf.duration;refreshShrinkUI();
+    const kb=pickShrinkBitrate(buf.duration);
+    setLoadMsg('Offline ပြင်ဆင်နေသည်… ('+kb+' kbps · mono · 24 kHz)');
+    const off=new OfflineAudioContext(1,Math.max(1,Math.ceil(buf.duration*SHRINK_SR)),SHRINK_SR);
+    const src=off.createBufferSource();src.buffer=buf;src.connect(off.destination);src.start();
+    const pcm=await off.startRendering();
+    if(shrinkCancel)throw cancelErr();
+    const ch=pcm.getChannelData(0);
+    let out=null,ext='';
+    if('AudioEncoder' in window){
+      try{out=await encodeShrinkOpus(ch,kb);ext='webm'}catch(e){if(e&&e.cancelled)throw e;out=null}}
+    if(!out){try{out=await encodeShrinkMp3(ch,kb);ext='mp3'}
+      catch(e){if(e&&e.cancelled)throw e;throw new Error('Encoder မရပါ — Chrome နောက်ဆုံး version ဖြင့် ထပ်ကြိုးစားပါ')}}
+    result={blob:out,ext,kb};
+  }catch(e){err=e}
+  loadCancelFn=null;hideLoad();
+  if(err){if(err.cancelled||shrinkCancel)showNotice('⛔ ရပ်လိုက်ပြီ — ဖိုင် မချုံ့ပါ','ok');
+    else showNotice('ချုံ့ မရပါ — '+(err&&err.message?err.message:err),'err');return}
+  shrinkBlob=result.blob;shrinkExt=result.ext;
+  if(shrinkUrl)URL.revokeObjectURL(shrinkUrl);shrinkUrl=URL.createObjectURL(shrinkBlob);
+  const before=shrinkFile.size,after=shrinkBlob.size;const pct=Math.max(0,Math.round((1-after/before)*100));
+  const over=after>20*1048576;
+  $('shrinkResultMeta').textContent='မူလ '+fmtMB(before)+' → အသစ် '+fmtMB(after)+' ('+pct+'% လျော့သွားသည်) · '+result.kb+' kbps · .'+result.ext+(over?' · ⚠️ 20 MB ကျော်နေပါသေးသည် — အသံကို ပိုင်းခွဲပြီး ပို့ပါ':' · ✅ Telegram bot ဆီ ပို့နိုင်ပါပြီ');
+  $('shrinkResult').classList.remove('hidden');
+  showDone('✅ ချုံ့ပြီးပါပြီ','မူလ '+fmtMB(before)+' → '+fmtMB(after)+(over?' — သို့သော် 20 MB ကျော်နေပါသေးသည်':''))});
+$('btnDlShrink').addEventListener('click',()=>{if(!shrinkBlob||!shrinkUrl)return;
+  const a=document.createElement('a');a.href=shrinkUrl;a.download=shrinkNameBase()+'_small.'+shrinkExt;a.click()});
+$('btnUseShrink').addEventListener('click',async()=>{if(!shrinkBlob)return;
+  const nm=shrinkNameBase()+'_small.'+shrinkExt;
+  await opBusy('Project အသံ အဖြစ် သတ်မှတ်နေပါတယ်…',async()=>{await idb.put('audio:'+state.id,shrinkBlob);await setAudioBlob(shrinkBlob,nm)});
+  closeSheets();showDone('✅ အသံ ရပါပြီ','ချုံ့ထားသော ဖိုင်ကို Project ၏ အသံ အဖြစ် သတ်မှတ်ပြီးပါပြီ')});
 
 /* ============ init ============ */
 function refreshAll(){refreshTypoUI();
