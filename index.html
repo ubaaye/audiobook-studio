@@ -1601,15 +1601,49 @@ async function encodeShrinkOpus(ch,kb){
     await enc.flush();if(shrinkCancel)throw cancelErr();if(encErr)throw encErr;
   }finally{try{enc.close()}catch(e){}}
   muxer.finalize();return new Blob([muxer.target.buffer],{type:'audio/webm'})}
-let lameLib=null;
+let lameLib=null,lameLoading=null;
+/* MP3 encoder (lamejs) — MUST be the CLASSIC build loaded as a classic
+   <script>. The jsDelivr "+esm" bundle loads fine and exports an
+   Mp3Encoder constructor, but its internals reference MPEGMode as a
+   free global, so the first encodeBuffer() throws
+   "MPEGMode is not defined" (reproduced in Node, 2026-11-07). The
+   classic lame.min.js keeps every internal in one scope and works.
+   loadLame() tries each pinned CDN in turn and SMOKE-TESTS the encoder
+   (a build that loads but cannot encode is treated as unavailable);
+   if no CDN yields a working encoder it throws mp3EncErr(). */
+const LAME_CLASSIC_URLS=[
+ 'https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js',
+ 'https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js'];
+function mp3EncErr(){const e=new Error('MP3 encode မရပါ — internet စစ်ပြီး page reload လုပ်ပါ (WebM format ရွေးသုံးနိုင်သည်)');e.mp3Enc=true;return e}
+function lameScriptLoad(url){return new Promise((res,rej)=>{
+  const s=document.createElement('script');s.src=url;s.async=true;
+  const to=setTimeout(()=>rej(new Error('lamejs load timeout')),20000);
+  s.onload=()=>{clearTimeout(to);res()};
+  s.onerror=()=>{clearTimeout(to);rej(new Error('lamejs load fail'))};
+  document.head.appendChild(s)})}
+function lameSmokeTest(L){const enc=new L.Mp3Encoder(1,16000,64);
+  const d=enc.encodeBuffer(new Int16Array(1152));const end=enc.flush();
+  const n=(d?d.length:0)+(end?end.length:0);
+  if(!n)throw new Error('lamejs smoke fail')}
 async function loadLame(){if(lameLib)return lameLib;
-  try{const m=await import('https://cdn.jsdelivr.net/npm/lamejs@1.2.1/+esm');lameLib=m.default||m}
-  catch(e){await import('https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js');lameLib=window.lamejs}
-  if(!lameLib||!lameLib.Mp3Encoder)throw new Error('lamejs မရပါ');
-  return lameLib}
+  if(lameLoading)return lameLoading;
+  lameLoading=(async()=>{
+    let first=true;
+    for(const url of LAME_CLASSIC_URLS){
+      try{
+        if(!first)window.lamejs=undefined; /* force a fresh load below */
+        first=false;
+        if(!(window.lamejs&&window.lamejs.Mp3Encoder))await lameScriptLoad(url);
+        const L=window.lamejs;
+        if(!L||!L.Mp3Encoder)throw new Error('lamejs missing');
+        lameSmokeTest(L);lameLib=L;return L;
+      }catch(e){/* broken or unreachable build — try the next CDN */}}
+    throw mp3EncErr()})();
+  try{return await lameLoading}catch(e){lameLoading=null;throw e}}
 /* Generic mono MP3 encode from Float32 PCM (lamejs) — shared by the
    shrinker and the converter's STT chunker. */
 async function encodeMp3Mono(ch,sr,kb,isCancel,onProg){const L=await loadLame();
+  try{
   const enc=new L.Mp3Encoder(1,sr,kb);const parts=[];const BLK=1152;
   for(let off=0;off<ch.length;off+=BLK){
     if(isCancel&&isCancel())throw cancelErr();
@@ -1618,7 +1652,10 @@ async function encodeMp3Mono(ch,sr,kb,isCancel,onProg){const L=await loadLame();
     const d=enc.encodeBuffer(i16);if(d&&d.length)parts.push(d);
     if(onProg&&off%(BLK*512)===0)onProg(off/ch.length)}
   const end=enc.flush();if(end&&end.length)parts.push(end);
-  return new Blob(parts,{type:'audio/mpeg'})}
+  return new Blob(parts,{type:'audio/mpeg'})
+  }catch(e){if(e&&e.cancelled)throw e;
+    if(e instanceof ReferenceError||(e&&/MPEGMode|Mp3Encoder|lamejs/i.test(e.message||'')))throw mp3EncErr();
+    throw e}}
 async function encodeShrinkMp3(ch,kb){return encodeMp3Mono(ch,SHRINK_SR,kb,()=>shrinkCancel,
   p=>setLoadMsg('Encode (MP3) — '+Math.round(p*100)+'%'))}
 /* Long MP4-family sources: shrink segment by segment (bounded memory).
