@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a0b0d">
 <title>Audiobook Studio</title>
-<!-- build: 2026-11-09 · fast-export fix (interleaved A/V encode, cached static layer, half-res background, honest progress + elapsed, 8192-sample audio chunks, queue buttons full-width) · 2026-11-08 shrinker single-pass pipeline · action buttons full-width centred -->
+<!-- build: 2026-11-09 · turbo export profile (720p/15fps Fast path, per-job profile remembered in queue) · fast-export fix (interleaved A/V encode, cached static layer, half-res background, honest progress + elapsed, 8192-sample audio chunks, queue buttons full-width) · 2026-11-08 shrinker single-pass pipeline · action buttons full-width centred -->
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -308,11 +308,16 @@ footer.note{color:var(--dim);font-size:11px;text-align:center;line-height:1.6;ma
   <div class="grab"></div>
   <div class="shead"><h3>⬆ Video ထုတ်ရန်</h3><button class="xbtn" data-close-sheet>✕</button></div>
   <div class="sbody">
-    <p style="font-size:12.5px;color:var(--mut);line-height:1.6;margin:2px 0 4px">1920×1080 · အသံဖိုင် အပြည့်အစုံ ပါဝင်မည် · ဖိုင်အမည်သည် ခေါင်းစဉ် အတိုင်း ဖြစ်မည် · တစ်ခုပြီးမှ တစ်ခု အစဉ်လိုက် (FIFO) ထုတ်ပေးမည် · Browser က WebCodecs ရလျှင် ⚡ Fast ဖြင့် အချိန်တိုတို ထုတ်မည် (မရလျှင် ပုံမှန် Real-time)</p>
+    <p style="font-size:12.5px;color:var(--mut);line-height:1.6;margin:2px 0 4px">1080p (သို့) ⚡ Turbo 720p · အသံဖိုင် အပြည့်အစုံ ပါဝင်မည် · ဖိုင်အမည်သည် ခေါင်းစဉ် အတိုင်း ဖြစ်မည် · တစ်ခုပြီးမှ တစ်ခု အစဉ်လိုက် (FIFO) ထုတ်ပေးမည် · Browser က WebCodecs ရလျှင် ⚡ Fast ဖြင့် အချိန်တိုတို ထုတ်မည် (မရလျှင် ပုံမှန် Real-time) · ⚡ Turbo = 720p/15fps — အသံစာအုပ် Video အတွက် အရည်အသွေး မကျဘဲ အများကြီး ပိုမြန်မည်</p>
     <label class="fl">ထုတ်မည့် အရည်အသွေး</label>
     <div class="chips" id="exportFmtChips">
       <button class="chip on" data-fmt="auto">Auto (MP4 ရလျှင် MP4)</button>
       <button class="chip" data-fmt="webm">WebM</button>
+    </div>
+    <label class="fl">ဗီဒီယို အရွယ်</label>
+    <div class="chips" id="exportProfileChips">
+      <button class="chip on" data-prof="std">ပုံမှန် 1080p</button>
+      <button class="chip" data-prof="turbo">⚡ Turbo 720p</button>
     </div>
     <div style="height:14px"></div>
     <button class="btn primary wide" id="btnQueueExport">＋ Export Queue ထဲ ထည့်မယ်</button>
@@ -1018,7 +1023,7 @@ function renderJobs(){const box=$('exportJobs');
     let acts='';
     if(j===currentJob)acts='<div class="acts"><button class="jobbtn" data-cancel-job="'+j.id+'">⛔ ရပ်</button></div>';
     else if(!j.cancelled)acts='<div class="acts"><button class="jobbtn" data-remove-job="'+j.id+'">✕ ဖယ်မယ်</button></div>';
-    d.innerHTML='<div class="t">'+esc(j.title)+'</div><div class="m">'+esc(j.status)+'</div><div class="prog"><i style="width:'+Math.round(j.progress*100)+'%"></i></div>'+acts;
+    d.innerHTML='<div class="t">'+esc(j.title)+(j.profile==='turbo'?' · ⚡ Turbo':'')+'</div><div class="m">'+esc(j.status)+'</div><div class="prog"><i style="width:'+Math.round(j.progress*100)+'%"></i></div>'+acts;
     box.appendChild(d)})}
 $('exportJobs').addEventListener('click',e=>{
   const cb=e.target.closest('[data-cancel-job]');if(cb){cancelExport();return}
@@ -1033,13 +1038,17 @@ function pickMime(fmt){const cands=fmt==='webm'
 document.querySelectorAll('#exportFmtChips .chip').forEach(ch=>ch.addEventListener('click',()=>{
   document.querySelectorAll('#exportFmtChips .chip').forEach(x=>x.classList.remove('on'));ch.classList.add('on')}));
 function exportFormat(){const on=document.querySelector('#exportFmtChips .chip.on');return on?on.dataset.fmt:'auto'}
+document.querySelectorAll('#exportProfileChips .chip').forEach(ch=>ch.addEventListener('click',()=>{
+  document.querySelectorAll('#exportProfileChips .chip').forEach(x=>x.classList.remove('on'));ch.classList.add('on')}));
+function exportProfile(){const on=document.querySelector('#exportProfileChips .chip.on');return on?on.dataset.prof:'std'}
 $('btnQueueExport').addEventListener('click',async()=>{
   if(!RT.audioUrl){showNotice('အသံဖိုင် အရင် ထည့်ပါ — "အသံဖိုင် ရွေးမယ်" မှ တင်ပါ','err');return}
   const fmt=exportFormat();
+  const profile=exportProfile();
   if(typeof MediaRecorder==='undefined'||!document.createElement('canvas').captureStream){
     showNotice('ဤ Browser တွင် Video Export မရပါ — Chrome နောက်ဆုံး version သုံးပါ','err');return}
   const job={id:'j'+Date.now().toString(36),title:(fileBase()||state.audioName||'audiobook'),
-    fmt,progress:0,status:'စောင့်ဆိုင်းနေသည်…',snapshot:JSON.parse(JSON.stringify(state))};
+    fmt,profile,progress:0,status:'စောင့်ဆိုင်းနေသည်…',snapshot:JSON.parse(JSON.stringify(state))};
   jobs.push(job);renderJobs();showNotice('Queue ထဲ ထည့်ပြီးပါပြီ — အစဉ်လိုက် ထုတ်ပေးပါမည်','ok');
   processQueue()});
 async function processQueue(){if(queueRunning)return;queueRunning=true;
@@ -1066,11 +1075,11 @@ $('btnCancelExport').addEventListener('click',()=>{if(loadCancelFn)loadCancelFn(
 
 /* ---- export dispatcher: fast (WebCodecs) when possible, else real-time ---- */
 async function runExport(job){
-  if(job.snapshot.hasBgVideo){job.mode='custom background — real-time export';await runExportRT(job);return}
+  if(job.snapshot.hasBgVideo){job.mode='custom background — real-time export'+(job.profile==='turbo'?' · Turbo မပါ (1080p)':'');await runExportRT(job);return}
   if(('VideoEncoder' in window)&&('AudioEncoder' in window)){
-    try{await runFastExport(job);job.mode='⚡ Fast export (WebCodecs)';return}
-    catch(e){if(e&&e.cancelled)throw e;job.mode='🎬 Real-time export (Fast မရပါ)'}}
-  else job.mode='🎬 Real-time export';
+    try{await runFastExport(job);job.mode='⚡ Fast export (WebCodecs)'+(job.profile==='turbo'?' · ⚡ Turbo 720p':'');return}
+    catch(e){if(e&&e.cancelled)throw e;job.mode='🎬 Real-time export (Fast မရပါ)'+(job.profile==='turbo'?' · Turbo မပါ (1080p)':'')}}
+  else job.mode='🎬 Real-time export'+(job.profile==='turbo'?' · Turbo မပါ (1080p)':'');
   await runExportRT(job)}
 
 /* ---- fast export: WebCodecs + mp4-muxer, faster than real-time ---- */
@@ -1082,6 +1091,13 @@ async function loadMuxer(){if(muxerMod)return muxerMod;
   return muxerMod}
 async function runFastExport(job){job.status='ပြင်ဆင်နေသည်… (Fast)';renderJobs();
   const t0=Date.now();const elSec=()=>Math.round((Date.now()-t0)/1000);
+  /* Export profile: standard 1920×1080@30/8Mbps, or ⚡Turbo
+     1280×720@15/4Mbps — 4/9 the pixels at half the frame rate. The
+     only motion in these videos is the waveform strip + background
+     animation, so 15fps/720p loses nothing visible. The real-time
+     fallback stays 1080p (Turbo is a Fast-path profile). */
+  const TURBO=job.profile==='turbo';
+  const W=TURBO?1280:1920,H=TURBO?720:1080,FPS=TURBO?15:30,VBR=TURBO?4_000_000:8_000_000;
   let phase='ပြင်ဆင်နေသည်…';
   /* The popup is up from the very first await, with a 500 ms ticker that
      keeps the phase + elapsed time moving through the prep work. The old
@@ -1108,14 +1124,14 @@ async function runFastExport(job){job.status='ပြင်ဆင်နေသည�
     if(ae.cancelled)throw cancelErr();
     const SR=buf.sampleRate,CH=2;
     let vCfg=null;const vCands=['avc1.640033','avc1.640028','avc1.4d4028','avc1.42001f'];
-    for(const c of vCands){const cfg={codec:c,width:1920,height:1080,bitrate:8_000_000,framerate:30};
+    for(const c of vCands){const cfg={codec:c,width:W,height:H,bitrate:VBR,framerate:FPS};
       try{const s=await VideoEncoder.isConfigSupported(cfg);if(s&&s.supported){vCfg=s.config||cfg;break}}catch(e){}}
     if(!vCfg)throw new Error('H.264 encoder မရပါ');
     const aCfg={codec:'mp4a.40.2',sampleRate:SR,numberOfChannels:CH,bitrate:128_000};
     const aSup=await AudioEncoder.isConfigSupported(aCfg).catch(()=>null);
     if(!aSup||!aSup.supported)throw new Error('AAC encoder မရပါ');
     muxer=new mod.Muxer({target:new mod.ArrayBufferTarget(),
-      video:{codec:'avc',width:1920,height:1080},audio:{codec:'aac',sampleRate:SR,numberOfChannels:CH},
+      video:{codec:'avc',width:W,height:H},audio:{codec:'aac',sampleRate:SR,numberOfChannels:CH},
       fastStart:'in-memory',firstTimestampBehavior:'offset'});
     let encErr=null;
     vEnc=new VideoEncoder({output:(chunk,meta)=>muxer.addVideoChunk(chunk,meta),error:e=>{encErr=encErr||e}});
@@ -1124,9 +1140,9 @@ async function runFastExport(job){job.status='ပြင်ဆင်နေသည�
     aEnc.configure(aSup.config||aCfg);
     ae.requestCancel=()=>{try{vEnc.close()}catch(e){}try{aEnc.close()}catch(e){}};
     const savedState=state;state=Object.assign(defaults(),job.snapshot);
-    RT.exporting=true;job.status='⚡ Fast Render လုပ်နေသည်…';renderJobs();
-    phase='⚡ Fast Render လုပ်နေသည်…';
-    const cv=document.createElement('canvas');cv.width=1920;cv.height=1080;
+    RT.exporting=true;job.status='⚡ Fast Render လုပ်နေသည်…'+(TURBO?' (⚡ Turbo 720p)':'');renderJobs();
+    phase='⚡ Fast Render လုပ်နေသည်…'+(TURBO?' (⚡ Turbo 720p)':'');
+    const cv=document.createElement('canvas');cv.width=W;cv.height=H;
     const cx=cv.getContext&&cv.getContext('2d');
     /* Per-frame cost cut: the static foreground (card, cover, titles —
        incl. the old per-line measureText truncation loops) is painted
@@ -1134,9 +1150,9 @@ async function runFastExport(job){job.status='ပြင်ဆင်နေသည�
        painted at half resolution (soft gradients — the upscale is not
        visible) and blitted. Each frame is then: half-res theme paint +
        two drawImage blits + the waveform strip. */
-    const fg=document.createElement('canvas');fg.width=1920;fg.height=1080;
+    const fg=document.createElement('canvas');fg.width=W;fg.height=H;
     const fx=fg.getContext&&fg.getContext('2d');
-    const bgS=document.createElement('canvas');bgS.width=960;bgS.height=540;
+    const bgS=document.createElement('canvas');bgS.width=W/2;bgS.height=H/2;
     const bx=bgS.getContext&&bgS.getContext('2d');
     const sleep=ms=>new Promise(r=>setTimeout(r,ms));
     /* Unified honest progress: media-seconds encoded / total duration,
@@ -1149,7 +1165,7 @@ async function runFastExport(job){job.status='ပြင်ဆင်နေသည�
       setLoadMsg(Math.round(p*100)+'% · ကြာချိန် '+elSec()+' စက္ကန့် — "'+job.title+'"');renderJobs()};
     try{
       if(!cx||!fx||!bx)throw new Error('Canvas မရပါ');
-      drawFrameForeground(fx,1920,1080);
+      drawFrameForeground(fx,W,H);
       const ch0=buf.getChannelData(0),ch1=buf.numberOfChannels>1?buf.getChannelData(1):ch0;
       const CPF=8192;let aOff=0; /* samples fed to the AAC encoder so far */
       const feedAudioUntil=async sampleEnd=>{
@@ -1166,17 +1182,17 @@ async function runFastExport(job){job.status='ပြင်ဆင်နေသည�
          of the frame being encoded — instead of encoding the whole
          audio track first. Progress therefore moves from the first
          frame, and the two encoders' work overlaps. */
-      const fps=30,total=Math.max(1,Math.ceil(dur*fps));
+      const fps=FPS,total=Math.max(1,Math.ceil(dur*fps));
       const frameSamples=SR/fps;
       clearInterval(tick); /* prog() owns the popup message from here */
       for(let f=0;f<total;f++){
         if(ae.cancelled)throw cancelErr();if(encErr)throw encErr;
         await feedAudioUntil(Math.min(totalSamples,Math.round((f+1)*frameSamples)));
         const t=f/fps;
-        paintBackground(bx,960,540,t);
-        cx.drawImage(bgS,0,0,1920,1080);
+        paintBackground(bx,W/2,H/2,t);
+        cx.drawImage(bgS,0,0,W,H);
         cx.drawImage(fg,0,0);
-        drawWaveStrip(cx,1920,1080,t,RT.peaks,t);
+        drawWaveStrip(cx,W,H,t,RT.peaks,t);
         const vf=new VideoFrame(cv,{timestamp:Math.round(f*1e6/fps),duration:Math.round(1e6/fps)});
         while(vEnc.encodeQueueSize>8){await sleep(4);if(ae.cancelled){vf.close();throw cancelErr()}if(encErr){vf.close();throw encErr}}
         vEnc.encode(vf,{keyFrame:f%(fps*5)===0});vf.close();
