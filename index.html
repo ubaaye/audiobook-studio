@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a0b0d">
 <title>Audiobook Studio</title>
-<!-- build: 2026-11-09 · foreign→Burmese VOICE WORKFLOW (guided stepper sheet: ၁ Groq Whisper → English text · ၂ Gemini translate → spoken-style Burmese · ၃ voice via narration engines, in-panel player + project-audio) · turbo export profile (720p/15fps Fast path, per-job profile remembered in queue) · fast-export fix (interleaved A/V encode, cached static layer, half-res background, honest progress + elapsed, 8192-sample audio chunks, queue buttons full-width) · 2026-11-08 shrinker single-pass pipeline · action buttons full-width centred -->
+<!-- build: 2026-11-09 · STT parallel (workflow step 1 + converter: 3 chunks at a time, order preserved, 429 backoff/retry ×2, named-chunk errors; chunks already 16kHz mono MP3 64kbps ≈3.7MB/8min) · foreign→Burmese VOICE WORKFLOW (guided stepper sheet: ၁ Groq Whisper → English text · ၂ Gemini translate → spoken-style Burmese · ၃ voice via narration engines, in-panel player + project-audio) · turbo export profile (720p/15fps Fast path, per-job profile remembered in queue) · fast-export fix (interleaved A/V encode, cached static layer, half-res background, honest progress + elapsed, 8192-sample audio chunks, queue buttons full-width) · 2026-11-08 shrinker single-pass pipeline · action buttons full-width centred -->
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -2042,7 +2042,7 @@ async function groqTranscribe(key,fileBlob,name,lang,signal){
   if(lang)fd.append('language',lang);
   const res=await fetch('https://api.groq.com/openai/v1/audio/transcriptions',
     {method:'POST',headers:groqHeaders(key),body:fd,signal});
-  if(!res.ok)throw new Error(await groqErrText(res));
+  if(!res.ok){const e=new Error(await groqErrText(res));e.status=res.status;throw e}
   const data=await res.json();
   return (data&&data.text)||''}
 const CV_TRANSLATE_SYSTEM='You are a professional audiobook translator. Translate the user\'s text faithfully into NATURAL SPOKEN-STYLE Burmese (Myanmar) suitable for audiobook narration: use everyday spoken forms instead of stiff written forms, keep all names and terms consistent, write numbers as Burmese words where natural, and preserve paragraph breaks. Output ONLY the Burmese translation — no commentary, no notes, no original text.';
@@ -2154,11 +2154,12 @@ $('btnCvStart').addEventListener('click',async()=>{
   let err=null,result='';
   try{
     const pieces=await cvMakeSttChunks(blob,signal);
-    const texts=[];
-    for(let i=0;i<pieces.length;i++){
-      if(signal&&signal.aborted)throw cancelErr();
-      setLoadMsg('စာဖော်နေသည် '+(i+1)+' / '+pieces.length);
-      texts.push(await groqTranscribe(gk,pieces[i].blob,pieces[i].name,cvLang(),signal))}
+    /* Same parallel scheduler as workflow step 1 (3 at a time, chunk
+       order preserved, 429 backoff/retry, named-chunk failures). */
+    const texts=await sttTranscribeParallel(pieces.length,
+      i=>groqTranscribe(gk,pieces[i].blob,pieces[i].name,cvLang(),signal),
+      ()=>!!(signal&&signal.aborted),
+      (done,total)=>setLoadMsg('စာဖော်နေသည် '+done+' / '+total));
     const transcript=texts.join(' ').trim();
     if(!transcript)throw new Error('စာသား ဖော်၍ မရပါ — အသံ ရှင်းရှင်း ဖိုင် ပြောင်းသုံးကြည့်ပါ');
     const tChunks=splitLongText(transcript,3000);const outs=[];
@@ -2171,7 +2172,7 @@ $('btnCvStart').addEventListener('click',async()=>{
   loadCancelFn=null;cvAbort=null;hideLoad();
   if(err){if(err.cancelled||(err&&err.name==='AbortError')||(signal&&signal.aborted))
       showNotice('⛔ ရပ်လိုက်ပြီ — ဘာသာပြန် မလုပ်ပါ','ok');
-    else showNotice('မအောင်မြင်ပါ — '+(err&&err.message?err.message:err),'err');return}
+    else showNotice('မအောင်မြင်ပါ — '+((err&&err.chunkIndex!=null)?('အပိုင်း '+(err.chunkIndex+1)+' မအောင်မြင်: '):'')+(err&&err.message?err.message:err),'err');return}
   $('cvText').value=result;$('cvCount').textContent=result.length;
   $('cvResult').classList.remove('hidden');
   showDone('✅ ဘာသာပြန် ပြီးပါပြီ','မြန်မာ စာသားကို စစ်ဆေး ပြင်ဆင်ပြီး "🎙️ Narration သို့ ပို့" နှိပ်ပါ')});
@@ -2283,9 +2284,69 @@ async function groqTranscribeEx(key,fileBlob,name,route,signal){
   if(route&&route.language)fd.append('language',route.language);
   const res=await fetch('https://api.groq.com/openai/v1/audio/transcriptions',
     {method:'POST',headers:groqHeaders(key),body:fd,signal});
-  if(!res.ok)throw new Error(await groqErrText(res));
+  if(!res.ok){const e=new Error(await groqErrText(res));e.status=res.status;throw e}
   const data=await res.json();
   return{text:(data&&data.text)||'',language:(data&&data.language)||''}}
+/* PAR-STT-BEGIN */
+/* Parallel STT chunk scheduler (workflow step 1 + the converter sheet):
+   runs transcribe(i) for i in [0,count) with bounded concurrency
+   (STT_CONCURRENCY), assembles the texts in CHUNK ORDER regardless of
+   completion order, and reports progress as onProgress(done,total,
+   inFlightIndices). A chunk that fails with HTTP 429 (Groq rate limit)
+   is retried with backoff, at most STT_429_RETRIES times; a chunk that
+   still fails rejects the whole run with that chunk's TRUE error,
+   tagged e.chunkIndex (0-based) so the caller can name the chunk —
+   chunks are never silently skipped. Cancel (isCancelled() true):
+   no new chunk starts, in-flight results are discarded, and the run
+   rejects with a cancelled error — nothing is written by callers. */
+const STT_CONCURRENCY=3;
+const STT_429_RETRIES=2;
+const STT_429_BACKOFF_MS=[2000,5000];
+function sttIs429(e){return !!e&&(e.status===429||/\b429\b|rate.?limit/i.test(e.message||''))}
+function sttSleep(ms,isCancelled){
+  return new Promise(resolve=>{
+    const t0=Date.now();
+    const tick=()=>{if(isCancelled&&isCancelled())return resolve(false);
+      if(Date.now()-t0>=ms)return resolve(true);
+      setTimeout(tick,Math.min(200,Math.max(1,ms-(Date.now()-t0))))};
+    tick()})}
+async function sttTranscribeParallel(count,transcribe,isCancelled,onProgress){
+  const texts=new Array(count).fill(null);
+  let next=0,done=0,failErr=null;
+  const inFlight=new Set();
+  const report=()=>{if(onProgress)onProgress(done,count,Array.from(inFlight))};
+  async function runOne(i){
+    let retries=0;
+    for(;;){
+      try{return await transcribe(i)}
+      catch(e){
+        if(isCancelled&&isCancelled())throw e;
+        if(sttIs429(e)&&retries<STT_429_RETRIES){
+          const wait=STT_429_BACKOFF_MS[Math.min(retries,STT_429_BACKOFF_MS.length-1)];
+          retries++;
+          const ok=await sttSleep(wait,isCancelled);
+          if(!ok||(isCancelled&&isCancelled()))throw e;
+          continue}
+        throw e}}}
+  async function worker(){
+    for(;;){
+      if(failErr)return;
+      if(isCancelled&&isCancelled())return;
+      const i=next++;if(i>=count)return;
+      inFlight.add(i);report();
+      try{texts[i]=await runOne(i)}
+      catch(e){inFlight.delete(i);
+        if(isCancelled&&isCancelled())return;
+        if(!failErr){e.chunkIndex=i;failErr=e}
+        return}
+      inFlight.delete(i);done++;report()}}
+  const pool=[];
+  for(let k=0;k<Math.min(STT_CONCURRENCY,count);k++)pool.push(worker());
+  await Promise.all(pool);
+  if(isCancelled&&isCancelled())throw cancelErr();
+  if(failErr)throw failErr;
+  return texts}
+/* PAR-STT-END */
 $('btnWfStt').addEventListener('click',async()=>{
   const gk=(localStorage.getItem(LS_GROQ)||'').trim();
   if(!gk){wfSetStatus(1,'err','Groq API Key မရှိပါ — Settings မှာ ထည့်ပါ');
@@ -2313,20 +2374,25 @@ $('btnWfStt').addEventListener('click',async()=>{
   let err=null,en='';
   try{
     const pieces=await cvMakeSttChunks(blob,signal);
-    const texts=[];
-    for(let i=0;i<pieces.length;i++){
-      if(signal&&signal.aborted)throw cancelErr();
-      wfSetProg(1,'စာဖော်နေသည် '+(i+1)+' / '+pieces.length);
-      const r=await groqTranscribeEx(gk,pieces[i].blob,pieces[i].name,route,signal);
-      texts.push(r.text);
-      if(r.language)wfSetProg(1,'စာဖော်နေသည် '+(i+1)+' / '+pieces.length+' · မူရင်း ဘာသာ: '+r.language)}
+    /* Chunks upload/transcribe 3 at a time (sttTranscribeParallel) —
+       results still assemble in chunk order; progress shows done/total
+       plus which chunks are in flight. */
+    let detLang='';
+    const texts=await sttTranscribeParallel(pieces.length,
+      async i=>{const r=await groqTranscribeEx(gk,pieces[i].blob,pieces[i].name,route,signal);
+        if(r.language&&!detLang)detLang=r.language;
+        return r.text},
+      ()=>!!(signal&&signal.aborted),
+      (done,total,flight)=>wfSetProg(1,'စာဖော်နေသည် '+done+' / '+total+
+        (flight.length?' · လုပ်နေဆဲ အပိုင်း '+flight.map(x=>x+1).join(', '):'')+
+        (detLang?' · မူရင်း ဘာသာ: '+detLang:'')));
     en=texts.join(' ').trim();
     if(!en)throw new Error('စာသား ဖော်၍ မရပါ — အသံ ရှင်းရှင်း ဖိုင် ပြောင်းသုံးကြည့်ပါ');
   }catch(e){err=e}
   setLoadMsg=prevSetLoadMsg;
   wfAbort=null;wfBusy(1,false);wfSetProg(1,'');
   if(err){if(err.cancelled||err.name==='AbortError')wfSetStatus(1,'wait','ရပ်လိုက်ပြီ — ပြန်စလို့ ရသည်');
-    else wfSetStatus(1,'err','မအောင်မြင်ပါ — '+(err.message||err));return}
+    else wfSetStatus(1,'err','မအောင်မြင်ပါ — '+((err.chunkIndex!=null)?('အပိုင်း '+(err.chunkIndex+1)+' မအောင်မြင်: '):'')+(err.message||err));return}
   $('wfEnText').value=en;$('wfEnCount').textContent=en.length;
   if(wfSnapEn&&en!==wfSnapEn)wfSetStatus(2,'wait','English စာသား အသစ် ရပြီ — ပြန် ဘာသာပြန်ပါ');
   wfSetStatus(1,'done','English စာသား ရပါပြီ ('+en.length+' လုံး) — စစ်ဆေး ပြင်ဆင်ပြီး "နောက် အဆင့်" နှိပ်ပါ');
