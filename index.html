@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a0b0d">
 <title>Audiobook Studio</title>
-<!-- build: 2026-11-09 · WORKFLOW STEP 1 = GEMINI (chunks → Gemini generateContent with inline_data audio; chain gemini-3.8-flash FIRST with thinkingConfig.thinkingLevel=low — default thinking took 262s/sentence live — then 2.5-flash → 2.5-flash-lite → 2.0-flash, advancing only on 404; step 1 gates on the Gemini key, no Groq key needed; converter sheet unchanged, still Groq) · BUGFIX workflow step 1 Groq routing: Groq rejects a `task` param (400 unknown param) — transcribe via /audio/transcriptions with NO task field, translate via the separate /audio/translations endpoint (verbose_json on both, live-verified) · STT parallel (workflow step 1 + converter: 3 chunks at a time, order preserved, 429 backoff/retry ×2, named-chunk errors; chunks already 16kHz mono MP3 64kbps ≈3.7MB/8min) · foreign→Burmese VOICE WORKFLOW (guided stepper sheet: ၁ Groq Whisper → English text · ၂ Gemini translate → spoken-style Burmese · ၃ voice via narration engines, in-panel player + project-audio) · turbo export profile (720p/15fps Fast path, per-job profile remembered in queue) · fast-export fix (interleaved A/V encode, cached static layer, half-res background, honest progress + elapsed, 8192-sample audio chunks, queue buttons full-width) · 2026-11-08 shrinker single-pass pipeline · action buttons full-width centred -->
+<!-- build: 2026-11-09 · narration script .txt upload (📄 Txt ဖိုင် ရွေးမယ် in sheetNarrate loads a .txt — e.g. the bot's 🌐 output — into the script: UTF-8/UTF-16 decode, BOM stripped, ≤2 MB, counter updated via the real 'input' event) · WORKFLOW STEP 1 = GEMINI (chunks → Gemini generateContent with inline_data audio; chain gemini-3.8-flash FIRST with thinkingConfig.thinkingLevel=low — default thinking took 262s/sentence live — then 2.5-flash → 2.5-flash-lite → 2.0-flash, advancing only on 404; step 1 gates on the Gemini key, no Groq key needed; converter sheet unchanged, still Groq) · BUGFIX workflow step 1 Groq routing: Groq rejects a `task` param (400 unknown param) — transcribe via /audio/transcriptions with NO task field, translate via the separate /audio/translations endpoint (verbose_json on both, live-verified) · STT parallel (workflow step 1 + converter: 3 chunks at a time, order preserved, 429 backoff/retry ×2, named-chunk errors; chunks already 16kHz mono MP3 64kbps ≈3.7MB/8min) · foreign→Burmese VOICE WORKFLOW (guided stepper sheet: ၁ Groq Whisper → English text · ၂ Gemini translate → spoken-style Burmese · ၃ voice via narration engines, in-panel player + project-audio) · turbo export profile (720p/15fps Fast path, per-job profile remembered in queue) · fast-export fix (interleaved A/V encode, cached static layer, half-res background, honest progress + elapsed, 8192-sample audio chunks, queue buttons full-width) · 2026-11-08 shrinker single-pass pipeline · action buttons full-width centred -->
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -252,6 +252,7 @@ footer.note{color:var(--dim);font-size:11px;text-align:center;line-height:1.6;ma
 <input type="file" id="fileBgVideo" accept="video/*" class="hidden">
 <input type="file" id="fileShrink" accept="audio/*,video/*,.mp3,.mp4,.m4a,.wav,.ogg,.webm,.flac,.aac" class="hidden">
 <input type="file" id="fileCv" accept="audio/*,video/*,.mp3,.mp4,.m4a,.wav,.ogg,.webm,.flac,.aac" class="hidden">
+<input type="file" id="fileTxt" accept=".txt,text/plain,text/*" class="hidden">
 <audio id="audioEl" preload="metadata" class="hidden"></audio>
 <video id="bgVideoEl" loop muted playsinline class="hidden"></video>
 
@@ -436,6 +437,7 @@ footer.note{color:var(--dim);font-size:11px;text-align:center;line-height:1.6;ma
     <textarea class="inp" id="ttsText" rows="7" placeholder="ပြောစေချင်သော စာသားကို ဒီမှာ ထည့်ပါ…"></textarea>
     <div style="font-size:12px;color:var(--mut);margin-top:5px"><span id="ttsCount">0</span> လုံး · စာရှည်လျှင် အပိုင်း ခွဲ၍ ထုတ်ပေးမည်</div>
     <div class="err-text" id="ttsTextErr">စာသား ထည့်ရန် လိုပါတယ် — ပြောစေချင်သော စာသား အရင် ရေးပါ။</div>
+    <button class="btn wide" id="btnPickTxt" style="margin-top:9px">📄 Txt ဖိုင် ရွေးမယ်</button>
     <label class="fl">Engine ရွေးမယ်</label>
     <div class="chips" id="narrEngineChips">
       <button class="chip on" data-eng="gemini">Gemini</button>
@@ -1509,6 +1511,30 @@ function renderTtsVoices(){const box=$('ttsVoiceList');if(!box)return;box.innerH
     box.appendChild(b)})}
 renderTtsVoices();
 $('ttsText').addEventListener('input',e=>{$('ttsCount').textContent=e.target.value.length});
+/* ---- 📄 Load the narration script from a .txt file (e.g. the Telegram bot's 🌐 .txt) ---- */
+/* TXT-PURE-BEGIN */
+const TXT_MAX_BYTES=2*1024*1024;
+function txtTooBig(size){return size>TXT_MAX_BYTES}
+function decodeTxtBytes(u8){let enc='utf-8',off=0;
+  if(u8.length>=3&&u8[0]===0xEF&&u8[1]===0xBB&&u8[2]===0xBF)off=3;
+  else if(u8.length>=2&&u8[0]===0xFF&&u8[1]===0xFE){enc='utf-16le';off=2}
+  else if(u8.length>=2&&u8[0]===0xFE&&u8[1]===0xFF){enc='utf-16be';off=2}
+  if(enc==='utf-8'){for(let i=off;i<u8.length;i++){if(u8[i]===0)throw new Error('not-text')}}
+  let t;try{t=new TextDecoder(enc,{fatal:true}).decode(u8.subarray(off))}catch(e){throw new Error('not-text')}
+  if(t.charCodeAt(0)===0xFEFF)t=t.slice(1);
+  return t}
+/* TXT-PURE-END */
+$('btnPickTxt').addEventListener('click',()=>$('fileTxt').click());
+$('fileTxt').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
+  if(f.type&&(f.type.indexOf('image/')===0||f.type.indexOf('audio/')===0||f.type.indexOf('video/')===0)){
+    showNotice('Txt ဖိုင် အစစ် ရွေးပါ','err');return}
+  if(txtTooBig(f.size)){showNotice('ဖိုင် ကြီးလွန်း ပါတယ် (အများဆုံး 2 MB)','err');return}
+  let text='';try{text=decodeTxtBytes(new Uint8Array(await f.arrayBuffer()))}
+  catch(err){showNotice('Txt ဖိုင် အစစ် ရွေးပါ','err');return}
+  if(!text.trim()){showNotice('ဖိုင် အလွတ် ဖြစ်နေပါတယ်','err');return}
+  const ta=$('ttsText');ta.value=text;ta.dispatchEvent(new Event('input',{bubbles:true}));
+  ta.classList.remove('bad');$('ttsTextErr').classList.remove('show');
+  showNotice('✅ ဖိုင် တင်ပြီးပါပြီ — '+f.name+' · '+text.length+' လုံး','ok')});
 function splitTtsText(text,max){max=max||550;const out=[];let cur='';
   const flush=()=>{if(cur.trim())out.push(cur.trim());cur=''};
   const sents=(text||'').split(/(?<=။)\s*/).filter(s=>s.length);
