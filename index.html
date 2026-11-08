@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a0b0d">
 <title>Audiobook Studio</title>
-<!-- build: 2026-11-09 · STT parallel (workflow step 1 + converter: 3 chunks at a time, order preserved, 429 backoff/retry ×2, named-chunk errors; chunks already 16kHz mono MP3 64kbps ≈3.7MB/8min) · foreign→Burmese VOICE WORKFLOW (guided stepper sheet: ၁ Groq Whisper → English text · ၂ Gemini translate → spoken-style Burmese · ၃ voice via narration engines, in-panel player + project-audio) · turbo export profile (720p/15fps Fast path, per-job profile remembered in queue) · fast-export fix (interleaved A/V encode, cached static layer, half-res background, honest progress + elapsed, 8192-sample audio chunks, queue buttons full-width) · 2026-11-08 shrinker single-pass pipeline · action buttons full-width centred -->
+<!-- build: 2026-11-09 · BUGFIX workflow step 1 Groq routing: Groq rejects a `task` param (400 unknown param) — transcribe via /audio/transcriptions with NO task field, translate via the separate /audio/translations endpoint (verbose_json on both, live-verified) · STT parallel (workflow step 1 + converter: 3 chunks at a time, order preserved, 429 backoff/retry ×2, named-chunk errors; chunks already 16kHz mono MP3 64kbps ≈3.7MB/8min) · foreign→Burmese VOICE WORKFLOW (guided stepper sheet: ၁ Groq Whisper → English text · ၂ Gemini translate → spoken-style Burmese · ၃ voice via narration engines, in-panel player + project-audio) · turbo export profile (720p/15fps Fast path, per-job profile remembered in queue) · fast-export fix (interleaved A/V encode, cached static layer, half-res background, honest progress + elapsed, 8192-sample audio chunks, queue buttons full-width) · 2026-11-08 shrinker single-pass pipeline · action buttons full-width centred -->
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -2187,7 +2187,7 @@ $('btnCvClear').addEventListener('click',()=>{$('cvText').value='';$('cvCount').
    One guided sheet with a 3-step stepper. Step 1 reuses the converter's chunker
    (cvMakeSttChunks) + Groq Whisper, routed so the middle text is ENGLISH:
    English sources are transcribed; any other source goes through Whisper's
-   translate task (output is always English). Step 2 translates with GEMINI
+   /audio/translations endpoint (output is always English). Step 2 translates with GEMINI
    (visitor's own keys via geminiCall rotation; a model chain absorbs
    model_not_found like the Groq chain does). Step 3 reuses the narration
    engines' core calls (geminiTtsChunk / Edge synthesize + splitTtsText /
@@ -2196,11 +2196,11 @@ $('btnCvClear').addEventListener('click',()=>{$('cvText').value='';$('cvCount').
 /* WF-PURE-BEGIN */
 const WF_LANG_NAMES={th:'Thai',zh:'Chinese'};
 function wfSttRoute(lang){
-  if(lang==='en')return{task:'transcribe',language:'en',
+  if(lang==='en')return{mode:'transcribe',language:'en',
     note:'English အသံ → English စာသား တိုက်ရိုက် ဖော်မည် (transcribe)'};
-  if(lang)return{task:'translate',language:lang,
+  if(lang)return{mode:'translate',language:lang,
     note:(WF_LANG_NAMES[lang]||lang)+' အသံ → English စာသား အဖြစ် ဖော်မည် (Whisper translate)'};
-  return{task:'translate',language:'',
+  return{mode:'translate',language:'',
     note:'Auto — မည်သည့် ဘာသာ ဖြစ်စေ English စာသား အဖြစ် ဖော်မည် (Whisper translate)'}}
 const WF_TRANSLATE_SYSTEM='You are a professional translator for audiobooks. Translate the user\'s English text faithfully into NATURAL SPOKEN-STYLE Burmese (Myanmar) that will be READ ALOUD by a narrator: use everyday spoken Burmese forms and sentence endings instead of stiff written forms, write ALL numbers, years and quantities as Burmese words (e.g. 2024 as နှစ်ထောင့်နှစ်ဆယ့်လေး, 100 as တစ်ရာ), transliterate foreign names into Burmese script and keep them consistent, keep the meaning complete — never summarise or omit anything — and preserve paragraph breaks. Output ONLY the Burmese translation — no commentary, no notes, no English text.';
 function wfGeminiTranslateBody(text){return{systemInstruction:{parts:[{text:WF_TRANSLATE_SYSTEM}]},
@@ -2273,20 +2273,27 @@ $('wfMyText').addEventListener('input',e=>{$('wfMyCount').textContent=e.target.v
     wfSetStatus(3,'wait','မြန်မာ စာသား ပြင်ထားသည် — အသံ ပြန်ထုတ်ပါ')});
 [1,2].forEach(i=>$('btnWfCancel'+i).addEventListener('click',()=>{if(wfAbort)wfAbort.abort()}));
 $('btnWfCancel3').addEventListener('click',()=>{wfGenCancel=true;if(wfAbort)wfAbort.abort()});
-/* Groq Whisper with an explicit task (transcribe | translate) — groqTranscribe()
-   has no task param, so the workflow uses this twin; returns detected language. */
+/* Groq Whisper, routed (workflow step 1). Groq has NO `task` param —
+   sending one is rejected 400 "unknown param 'task'" (the old bug here).
+   Transcription is POST /audio/transcriptions (optional language field);
+   translation is the SEPARATE POST /audio/translations endpoint (output
+   is always English, and it takes no language field). verbose_json is
+   accepted by both (live-verified 2026-11-09). The translations
+   response's `language` names the OUTPUT language, so it is not
+   surfaced as the detected source language. Errors carry e.status
+   (the parallel scheduler's 429 retry depends on it). */
 async function groqTranscribeEx(key,fileBlob,name,route,signal){
+  const translate=!!(route&&route.mode==='translate');
   const fd=new FormData();
   fd.append('file',fileBlob,name||'audio.mp3');
   fd.append('model','whisper-large-v3');
   fd.append('response_format','verbose_json');
-  if(route&&route.task)fd.append('task',route.task);
-  if(route&&route.language)fd.append('language',route.language);
-  const res=await fetch('https://api.groq.com/openai/v1/audio/transcriptions',
+  if(!translate&&route&&route.language)fd.append('language',route.language);
+  const res=await fetch('https://api.groq.com/openai/v1/audio/'+(translate?'translations':'transcriptions'),
     {method:'POST',headers:groqHeaders(key),body:fd,signal});
   if(!res.ok){const e=new Error(await groqErrText(res));e.status=res.status;throw e}
   const data=await res.json();
-  return{text:(data&&data.text)||'',language:(data&&data.language)||''}}
+  return{text:(data&&data.text)||'',language:translate?'':((data&&data.language)||'')}}
 /* PAR-STT-BEGIN */
 /* Parallel STT chunk scheduler (workflow step 1 + the converter sheet):
    runs transcribe(i) for i in [0,count) with bounded concurrency
