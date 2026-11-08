@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a0b0d">
 <title>Audiobook Studio</title>
-<!-- build: 2026-11-09 · turbo export profile (720p/15fps Fast path, per-job profile remembered in queue) · fast-export fix (interleaved A/V encode, cached static layer, half-res background, honest progress + elapsed, 8192-sample audio chunks, queue buttons full-width) · 2026-11-08 shrinker single-pass pipeline · action buttons full-width centred -->
+<!-- build: 2026-11-09 · foreign→Burmese VOICE WORKFLOW (guided stepper sheet: ၁ Groq Whisper → English text · ၂ Gemini translate → spoken-style Burmese · ၃ voice via narration engines, in-panel player + project-audio) · turbo export profile (720p/15fps Fast path, per-job profile remembered in queue) · fast-export fix (interleaved A/V encode, cached static layer, half-res background, honest progress + elapsed, 8192-sample audio chunks, queue buttons full-width) · 2026-11-08 shrinker single-pass pipeline · action buttons full-width centred -->
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -156,6 +156,22 @@ canvas#thumbPreview{width:100%;aspect-ratio:16/9;display:block;border-radius:12p
 .waveanim i:nth-child(5){height:85%;animation-delay:.48s}.waveanim i:nth-child(6){height:50%;animation-delay:.6s}
 .waveanim i:nth-child(7){height:70%;animation-delay:.72s}
 @keyframes wv{0%,100%{transform:scaleY(.45)}50%{transform:scaleY(1)}}
+.btn:disabled{opacity:.55;pointer-events:none}
+.wfsteps{display:flex;gap:6px;margin:2px 0 14px}
+.wfstep{flex:1;text-align:center;font-size:11.5px;font-weight:700;padding:8px 3px;border-radius:11px;background:rgba(255,255,255,.05);color:var(--mut);line-height:1.5;border:1.5px solid transparent;cursor:pointer}
+.wfstep.on{color:#fff;border-color:var(--accent);background:rgba(255,255,255,.08)}
+.wfstep.done{color:var(--ok)}
+.wfstep.err{color:var(--err)}
+.wfstatus{font-size:12.5px;line-height:1.6;margin-top:10px;color:var(--mut)}
+.wfstatus.work{color:#fff}
+.wfstatus.done{color:var(--ok)}
+.wfstatus.err{color:var(--err)}
+.wfprog{font-size:12px;color:var(--mut);line-height:1.55;margin-top:2px}
+.wfdesc{font-size:12.5px;color:var(--mut);line-height:1.6;margin:2px 0 4px}
+.wfroute{font-size:12px;color:var(--accent2);line-height:1.55;margin:8px 0 0}
+.wfcount{font-size:12px;color:var(--mut);margin-top:5px}
+.wfnote{font-size:11.5px;color:var(--mut);line-height:1.6;margin:8px 0 0}
+.waveanim.wfmini{height:24px;margin:10px 0 2px}
 .notice{position:fixed;left:50%;transform:translate(-50%,20px);bottom:22px;z-index:70;max-width:92vw;opacity:0;pointer-events:none;transition:all .25s;
   padding:11px 16px;border-radius:13px;font-size:13px;font-weight:700;text-align:center;line-height:1.45;
   background:linear-gradient(160deg, rgba(38,42,52,.96), rgba(17,19,24,.97));border:1px solid var(--glassline);
@@ -223,6 +239,7 @@ footer.note{color:var(--dim);font-size:11px;text-align:center;line-height:1.6;ma
     <div class="rowbtns">
       <button class="btn wide" data-open-sheet="sheetShrink">📉 ဖိုင် ချုံ့မယ်</button>
       <button class="btn wide" data-open-sheet="sheetConvert">🌐 ဘာသာပြန် (အသံ → မြန်မာ)</button>
+      <button class="btn wide" data-open-sheet="sheetWorkflow">🌐 Workflow — နိုင်ငံခြား အသံ → မြန်မာ အသံ</button>
     </div>
     <p style="font-size:12px;color:var(--mut);line-height:1.6;margin:9px 0 0">အသံဖိုင်ကြီးများကို Telegram bot ဆီ ပို့နိုင်အောင် 20 MB အောက် ချုံ့ပေးသော ကိရိယာ</p>
   </section>
@@ -513,6 +530,116 @@ footer.note{color:var(--dim);font-size:11px;text-align:center;line-height:1.6;ma
     </div>
   </div>
 </div>
+
+<!-- Workflow: foreign audio → English text → Burmese text → voice (guided stepper) -->
+<div class="sheet" id="sheetWorkflow" role="dialog" aria-label="Workflow">
+  <div class="grab"></div>
+  <div class="shead"><h3>🌐 Workflow — နိုင်ငံခြား အသံ → မြန်မာ အသံ</h3><button class="xbtn" data-close-sheet>✕</button></div>
+  <div class="sbody">
+    <div class="wfsteps">
+      <div class="wfstep on" id="wfStep1">အဆင့် ၁<br>အသံ → စာသား</div>
+      <div class="wfstep" id="wfStep2">အဆင့် ၂<br>ဘာသာပြန်</div>
+      <div class="wfstep" id="wfStep3">အဆင့် ၃<br>အသံ ပြန်ထုတ်</div>
+    </div>
+
+    <!-- STEP 1 · audio → English text (Groq Whisper) -->
+    <div id="wfPanel1">
+      <p class="wfdesc">နိုင်ငံခြား အသံကို Groq Whisper ဖြင့် <b>English စာသား</b> ဖော်မည်။ Groq API Key လိုသည် (Settings မှာ ထည့်ပါ)။ အသံ ရှည်လျှင် အပိုင်း ခွဲ၍ ဖော်ပေးမည်။</p>
+      <label class="fl">အသံ အရင်းအမြစ်</label>
+      <div class="chips" id="wfSrcChips">
+        <button class="chip on" data-wfsrc="project">Project အသံ</button>
+        <button class="chip" data-wfsrc="file">ဖိုင် ရွေးမယ်</button>
+      </div>
+      <div id="wfFileRow" class="hidden">
+        <div style="height:10px"></div>
+        <button class="btn wide" id="btnWfPickFile">📁 အသံဖိုင် ရွေးမယ်</button>
+        <div id="wfFileMeta" style="font-size:12.5px;color:var(--mut);line-height:1.6;margin-top:6px">ဖိုင် မရွေးရသေးပါ</div>
+      </div>
+      <div class="err-text" id="wfSrcErr"></div>
+      <label class="fl">မူရင်း ဘာသာစကား</label>
+      <div class="chips" id="wfLangChips">
+        <button class="chip on" data-wflang="">Auto</button>
+        <button class="chip" data-wflang="en">English</button>
+        <button class="chip" data-wflang="th">Thai</button>
+        <button class="chip" data-wflang="zh">Chinese</button>
+      </div>
+      <p class="wfroute" id="wfRouteNote"></p>
+      <div style="height:12px"></div>
+      <button class="btn primary wide" id="btnWfStt">🎧 အဆင့် ၁ — စာသား ဖော်မယ်</button>
+      <div class="waveanim wfmini hidden" id="wfWave1"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <button class="btn wide hidden" id="btnWfCancel1" style="margin-top:9px">⛔ ရပ်</button>
+      <div class="wfstatus" id="wfStatus1">⏳ စောင့်နေသည် — အသံ ရွေးပြီး "စာသား ဖော်မယ်" နှိပ်ပါ</div>
+      <div class="wfprog" id="wfProg1"></div>
+      <label class="fl">English စာသား (ပြင်လို့ ရသည်)</label>
+      <textarea class="inp" id="wfEnText" rows="8" placeholder="English စာသား ဒီမှာ ပေါ်မည်"></textarea>
+      <div class="wfcount"><span id="wfEnCount">0</span> လုံး</div>
+      <div class="rowbtns" style="margin-top:10px">
+        <button class="btn primary" id="btnWfNext1">နောက် အဆင့် →</button>
+      </div>
+    </div>
+
+    <!-- STEP 2 · English → Burmese (Gemini) -->
+    <div id="wfPanel2" class="hidden">
+      <p class="wfdesc">English စာသားကို Gemini ဖြင့် <b>သဘာဝ ပြောစကား မြန်မာ</b> အဖြစ် ဘာသာပြန်မည် (အသံ ဖြင့် ဖတ်ရန် သင့်တော်သော ပုံစံ)။ Gemini API Key လိုသည် (Settings မှာ ထည့်ပါ)။</p>
+      <p class="wfroute" id="wfStep2Src"></p>
+      <div style="height:10px"></div>
+      <button class="btn primary wide" id="btnWfTranslate">🌐 အဆင့် ၂ — ဘာသာပြန်မယ်</button>
+      <div class="waveanim wfmini hidden" id="wfWave2"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <button class="btn wide hidden" id="btnWfCancel2" style="margin-top:9px">⛔ ရပ်</button>
+      <div class="wfstatus" id="wfStatus2">⏳ စောင့်နေသည် — "ဘာသာပြန်မယ်" နှိပ်ပါ</div>
+      <div class="wfprog" id="wfProg2"></div>
+      <label class="fl">မြန်မာ စာသား (ပြင်လို့ ရသည်)</label>
+      <textarea class="inp" id="wfMyText" rows="9" placeholder="မြန်မာ ဘာသာပြန် ဒီမှာ ပေါ်မည်"></textarea>
+      <div class="wfcount"><span id="wfMyCount">0</span> လုံး</div>
+      <p class="wfnote">⚠️ AI ဘာသာပြန်မှာ အမှား ပါနိုင်သည် — အသံ မထုတ်မီ စာသားကို သေချာ စစ်ဆေးပါ။</p>
+      <div class="rowbtns" style="margin-top:10px">
+        <button class="btn" id="btnWfBack2">← ပြန်</button>
+        <button class="btn primary" id="btnWfNext2">နောက် အဆင့် →</button>
+      </div>
+    </div>
+
+    <!-- STEP 3 · Burmese text → voice (narration engines) -->
+    <div id="wfPanel3" class="hidden">
+      <p class="wfdesc">မြန်မာ စာသားကို အသံ ပြန်ထုတ်မည် — Narration engine များ (Gemini / Edge) ကို ပဲ သုံးသည်။ စာ ရှည်လျှင် အပိုင်း ခွဲ၍ ထုတ်ပေးမည်။</p>
+      <p class="wfroute" id="wfStep3Src"></p>
+      <label class="fl">Engine ရွေးမယ်</label>
+      <div class="chips" id="wfEngChips">
+        <button class="chip on" data-wfeng="gemini">Gemini</button>
+        <button class="chip" data-wfeng="edge-thiha">Edge · Thiha</button>
+        <button class="chip" data-wfeng="edge-nilar">Edge · Nilar</button>
+      </div>
+      <div id="wfVoiceRow">
+        <label class="fl">အသံ (Voice)</label>
+        <button class="btn wide" id="wfVoiceBtn" data-open-sheet="sheetTtsVoices">Kore · တည်ကြည်</button>
+      </div>
+      <p class="wfnote" id="wfEdgeNote" style="display:none">Edge အသံ = အခမဲ့ — သုံးရန် Login ဝင်ထားရန် လိုသည် (Settings ထိပ်ဆုံး အကောင့် အပိုင်း)။</p>
+      <div style="height:12px"></div>
+      <button class="btn primary wide" id="btnWfGen">🎙️ အဆင့် ၃ — အသံ ထုတ်မယ်</button>
+      <div class="waveanim wfmini hidden" id="wfWave3"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <button class="btn wide hidden" id="btnWfCancel3" style="margin-top:9px">⛔ ရပ်</button>
+      <div class="wfstatus" id="wfStatus3">⏳ စောင့်နေသည် — Engine ရွေးပြီး "အသံ ထုတ်မယ်" နှိပ်ပါ</div>
+      <div class="wfprog" id="wfProg3"></div>
+      <div id="wfResult" class="hidden">
+        <label class="fl">ထုတ်ထားသော အသံ</label>
+        <div style="display:flex;gap:9px;align-items:center">
+          <button class="btn" id="btnWfPlay" style="flex:0 0 58px">▶</button>
+          <canvas id="wfWave" style="flex:1;height:44px;min-width:0"></canvas>
+        </div>
+        <div class="wfcount"><span id="wfTCur">0:00</span> / <span id="wfTDur">0:00</span></div>
+        <div class="rowbtns" style="margin-top:10px">
+          <button class="btn" id="btnWfDl">⬇ ဒေါင်းလုဒ်</button>
+          <button class="btn primary" id="btnWfUse">✅ Project အသံ အဖြစ် သုံးမယ်</button>
+        </div>
+        <p class="wfnote">Project အသံ အဖြစ် သုံးပြီးရင် Export ဖြင့် Video ဆက်ထုတ်နိုင်ပါတယ်။</p>
+      </div>
+      <div class="rowbtns" style="margin-top:10px">
+        <button class="btn" id="btnWfBack3">← ပြန်</button>
+      </div>
+    </div>
+  </div>
+</div>
+<input type="file" id="fileWf" accept="audio/*,video/*,.mp3,.mp4,.m4a,.wav,.ogg,.webm,.flac,.aac" class="hidden">
+<audio id="wfAudioEl" preload="metadata" class="hidden"></audio>
 
 <!-- Loading pop-up -->
 <div class="popwrap" id="loadPop"><div class="pop">
@@ -1369,12 +1496,16 @@ $('btnReset').addEventListener('click',async()=>{
 /* ============ Narration: text → speech (visitor's own Gemini key) ============ */
 const TTS_VOICES=[['Kore','တည်ကြည်'],['Achird','ဖော်ရွေ'],['Algenib','ကြမ်းတမ်း'],['Algieba','ချောမွေ'],['Alnilam','မာကျော'],['Aoede','လေညင်း'],['Autonoe','တောက်ပ'],['Callirrhoe','သာယာ'],['Charon','ရှင်းလင်း'],['Despina','ချောမွေ'],['Enceladus','လေသံပါ'],['Erinome','ကြည်လင်'],['Fenrir','စိတ်လှုပ်ရှား'],['Gacrux','ရင့်ကျက်'],['Iapetus','ကြည်လင်'],['Laomedeia','တက်ကြွ'],['Leda','နုပျို'],['Orus','မာကျော'],['Pulcherrima','တက်ကြွ'],['Puck','ရွှင်လန်း'],['Rasalgethi','ရှင်းလင်း'],['Sadachbia','ရွှင်လန်း'],['Sadaltager','ပညာရှင်'],['Schedar','ညီညွတ်'],['Sulafat','နွေးထွေး'],['Umbriel','သာယာ'],['Vindemiatrix','ညင်သာ'],['Zephyr','တောက်ပ'],['Zubenelgenubi','သာမန်'],['Achernar','ပျော့ပျောင်း']];
 let ttsVoice='Kore',ttsCancel=false,lastTtsUrl=null;
+let voiceReturnSheet='sheetNarrate'; /* sheet the voice picker returns to (Workflow sets its own) */
+$('btnTtsVoice').addEventListener('click',()=>{voiceReturnSheet='sheetNarrate'});
 function renderTtsVoices(){const box=$('ttsVoiceList');if(!box)return;box.innerHTML='';
   TTS_VOICES.forEach(v=>{const b=document.createElement('button');b.className='btn wide voicerow'+(ttsVoice===v[0]?' on':'');
     const s1=document.createElement('span');s1.textContent=v[0];
     const s2=document.createElement('span');s2.className='vdesc';s2.textContent=v[1];
     b.appendChild(s1);b.appendChild(s2);
-    b.addEventListener('click',()=>{ttsVoice=v[0];$('btnTtsVoice').textContent=v[0]+' · '+v[1];renderTtsVoices();openSheet('sheetNarrate')});
+    b.addEventListener('click',()=>{ttsVoice=v[0];$('btnTtsVoice').textContent=v[0]+' · '+v[1];
+      const wb=$('wfVoiceBtn');if(wb)wb.textContent=v[0]+' · '+v[1];
+      renderTtsVoices();openSheet(voiceReturnSheet)});
     box.appendChild(b)})}
 renderTtsVoices();
 $('ttsText').addEventListener('input',e=>{$('ttsCount').textContent=e.target.value.length});
@@ -2051,6 +2182,325 @@ $('btnCvToNarr').addEventListener('click',()=>{const t=$('cvText').value.trim();
 $('btnCvClear').addEventListener('click',()=>{$('cvText').value='';$('cvCount').textContent='0';
   $('cvResult').classList.add('hidden')});
 
+/* ============ Workflow: foreign audio → English text → Burmese text → voice ============
+   One guided sheet with a 3-step stepper. Step 1 reuses the converter's chunker
+   (cvMakeSttChunks) + Groq Whisper, routed so the middle text is ENGLISH:
+   English sources are transcribed; any other source goes through Whisper's
+   translate task (output is always English). Step 2 translates with GEMINI
+   (visitor's own keys via geminiCall rotation; a model chain absorbs
+   model_not_found like the Groq chain does). Step 3 reuses the narration
+   engines' core calls (geminiTtsChunk / Edge synthesize + splitTtsText /
+   pcmToWav / buffersToWav) and finishes IN-panel: custom waveform player,
+   download, and "use as project audio". */
+/* WF-PURE-BEGIN */
+const WF_LANG_NAMES={th:'Thai',zh:'Chinese'};
+function wfSttRoute(lang){
+  if(lang==='en')return{task:'transcribe',language:'en',
+    note:'English အသံ → English စာသား တိုက်ရိုက် ဖော်မည် (transcribe)'};
+  if(lang)return{task:'translate',language:lang,
+    note:(WF_LANG_NAMES[lang]||lang)+' အသံ → English စာသား အဖြစ် ဖော်မည် (Whisper translate)'};
+  return{task:'translate',language:'',
+    note:'Auto — မည်သည့် ဘာသာ ဖြစ်စေ English စာသား အဖြစ် ဖော်မည် (Whisper translate)'}}
+const WF_TRANSLATE_SYSTEM='You are a professional translator for audiobooks. Translate the user\'s English text faithfully into NATURAL SPOKEN-STYLE Burmese (Myanmar) that will be READ ALOUD by a narrator: use everyday spoken Burmese forms and sentence endings instead of stiff written forms, write ALL numbers, years and quantities as Burmese words (e.g. 2024 as နှစ်ထောင့်နှစ်ဆယ့်လေး, 100 as တစ်ရာ), transliterate foreign names into Burmese script and keep them consistent, keep the meaning complete — never summarise or omit anything — and preserve paragraph breaks. Output ONLY the Burmese translation — no commentary, no notes, no English text.';
+function wfGeminiTranslateBody(text){return{systemInstruction:{parts:[{text:WF_TRANSLATE_SYSTEM}]},
+  contents:[{parts:[{text:text}]}],generationConfig:{temperature:0.3}}}
+const WF_GEMINI_MODELS=['gemini-2.5-flash','gemini-2.5-flash-lite','gemini-2.0-flash'];
+const LS_WF_GMODEL='abs_wf_gemini_model';
+function wfGeminiModelOrder(){let saved='';try{saved=(localStorage.getItem(LS_WF_GMODEL)||'').trim()}catch(e){}
+  const order=WF_GEMINI_MODELS.slice();const i=order.indexOf(saved);
+  if(i>0){order.splice(i,1);order.unshift(saved)}return order}
+/* WF-PURE-END */
+let wfStep=1,wfFile=null,wfAbort=null,wfGenCancel=false,
+    wfVoiceBlob=null,wfVoiceUrl=null,wfPeaks=[],
+    wfSnapEn='',wfSnapMy='',wfJobGModel=null,
+    wfTickTimer=null,wfWorkStep=0,wfWorkMsg='',wfWorkT0=0;
+const WF_ICON={wait:'⏳',work:'🔄',done:'✅',err:'❌'};
+function wfSrc(){const on=document.querySelector('#wfSrcChips .chip.on');return on?on.dataset.wfsrc:'project'}
+function wfLang(){const on=document.querySelector('#wfLangChips .chip.on');return on?on.dataset.wflang:''}
+function wfEng(){const on=document.querySelector('#wfEngChips .chip.on');return on?on.dataset.wfeng:'gemini'}
+function wfStopTick(){if(wfTickTimer){clearInterval(wfTickTimer);wfTickTimer=null}}
+function wfRenderWork(){const el=$('wfStatus'+wfWorkStep);if(!el)return;
+  el.textContent='🔄 '+wfWorkMsg+' · ကြာချိန် '+Math.floor((Date.now()-wfWorkT0)/1000)+' စက္ကန့်'}
+function wfSetStatus(step,kind,msg){
+  const pill=$('wfStep'+step);
+  if(pill){pill.classList.toggle('done',kind==='done');pill.classList.toggle('err',kind==='err')}
+  const el=$('wfStatus'+step);if(!el)return;
+  el.className='wfstatus'+(kind==='wait'?'':' '+kind);
+  if(kind==='work'){
+    if(wfWorkStep!==step){wfWorkStep=step;wfWorkT0=Date.now();wfStopTick();
+      wfTickTimer=setInterval(wfRenderWork,500)}
+    wfWorkMsg=msg;wfRenderWork()}
+  else{if(wfWorkStep===step){wfWorkStep=0;wfStopTick()}
+    el.textContent=(WF_ICON[kind]||'')+' '+msg}}
+function wfSetProg(step,msg){const el=$('wfProg'+step);if(el)el.textContent=msg||''}
+function wfBusy(step,on){
+  const btn={1:$('btnWfStt'),2:$('btnWfTranslate'),3:$('btnWfGen')}[step];
+  if(btn)btn.disabled=on;
+  const wv=$('wfWave'+step);if(wv)wv.classList.toggle('hidden',!on);
+  const cb=$('btnWfCancel'+step);if(cb)cb.classList.toggle('hidden',!on)}
+function wfGo(step){
+  if(step===2&&!$('wfEnText').value.trim()){
+    showNotice('အဆင့် ၁ အရင် — English စာသား အရင် ဖော်ပါ (သို့) စာသား ထည့်ပါ','err');return}
+  if(step===3&&!$('wfMyText').value.trim()){
+    showNotice('အဆင့် ၂ အရင် — မြန်မာ စာသား အရင် ဘာသာပြန်ပါ (သို့) စာသား ထည့်ပါ','err');return}
+  wfStep=step;
+  for(let i=1;i<=3;i++){$('wfPanel'+i).classList.toggle('hidden',i!==step);
+    $('wfStep'+i).classList.toggle('on',i===step)}
+  if(step===2)$('wfStep2Src').textContent='အဆင့် ၁ မှ English စာသား '+$('wfEnText').value.trim().length+' လုံး — ပြင်ချင်ရင် အဆင့် ၁ သို့ ပြန်သွားပါ';
+  if(step===3)$('wfStep3Src').textContent='အဆင့် ၂ မှ မြန်မာ စာသား '+$('wfMyText').value.trim().length+' လုံး — ပြင်ချင်ရင် အဆင့် ၂ သို့ ပြန်သွားပါ'}
+[1,2,3].forEach(i=>$('wfStep'+i).addEventListener('click',()=>wfGo(i)));
+$('btnWfNext1').addEventListener('click',()=>wfGo(2));
+$('btnWfBack2').addEventListener('click',()=>wfGo(1));
+$('btnWfNext2').addEventListener('click',()=>wfGo(3));
+$('btnWfBack3').addEventListener('click',()=>wfGo(2));
+/* --- step 1 controls --- */
+document.querySelectorAll('#wfSrcChips .chip').forEach(ch=>ch.addEventListener('click',()=>{
+  document.querySelectorAll('#wfSrcChips .chip').forEach(x=>x.classList.remove('on'));ch.classList.add('on');
+  $('wfFileRow').classList.toggle('hidden',wfSrc()!=='file')}));
+function wfRouteNote(){$('wfRouteNote').textContent='➜ '+wfSttRoute(wfLang()).note}
+document.querySelectorAll('#wfLangChips .chip').forEach(ch=>ch.addEventListener('click',()=>{
+  document.querySelectorAll('#wfLangChips .chip').forEach(x=>x.classList.remove('on'));ch.classList.add('on');wfRouteNote()}));
+wfRouteNote();
+$('btnWfPickFile').addEventListener('click',()=>$('fileWf').click());
+$('fileWf').addEventListener('change',e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
+  wfFile=f;$('wfFileMeta').textContent=f.name+' · '+fmtMB(f.size);$('wfSrcErr').classList.remove('show')});
+$('wfEnText').addEventListener('input',e=>{$('wfEnCount').textContent=e.target.value.length;
+  if(wfSnapEn&&e.target.value.trim()&&e.target.value.trim()!==wfSnapEn)
+    wfSetStatus(2,'wait','English စာသား ပြင်ထားသည် — ပြန် ဘာသာပြန်ပါ')});
+$('wfMyText').addEventListener('input',e=>{$('wfMyCount').textContent=e.target.value.length;
+  if(wfSnapMy&&e.target.value.trim()&&e.target.value.trim()!==wfSnapMy)
+    wfSetStatus(3,'wait','မြန်မာ စာသား ပြင်ထားသည် — အသံ ပြန်ထုတ်ပါ')});
+[1,2].forEach(i=>$('btnWfCancel'+i).addEventListener('click',()=>{if(wfAbort)wfAbort.abort()}));
+$('btnWfCancel3').addEventListener('click',()=>{wfGenCancel=true;if(wfAbort)wfAbort.abort()});
+/* Groq Whisper with an explicit task (transcribe | translate) — groqTranscribe()
+   has no task param, so the workflow uses this twin; returns detected language. */
+async function groqTranscribeEx(key,fileBlob,name,route,signal){
+  const fd=new FormData();
+  fd.append('file',fileBlob,name||'audio.mp3');
+  fd.append('model','whisper-large-v3');
+  fd.append('response_format','verbose_json');
+  if(route&&route.task)fd.append('task',route.task);
+  if(route&&route.language)fd.append('language',route.language);
+  const res=await fetch('https://api.groq.com/openai/v1/audio/transcriptions',
+    {method:'POST',headers:groqHeaders(key),body:fd,signal});
+  if(!res.ok)throw new Error(await groqErrText(res));
+  const data=await res.json();
+  return{text:(data&&data.text)||'',language:(data&&data.language)||''}}
+$('btnWfStt').addEventListener('click',async()=>{
+  const gk=(localStorage.getItem(LS_GROQ)||'').trim();
+  if(!gk){wfSetStatus(1,'err','Groq API Key မရှိပါ — Settings မှာ ထည့်ပါ');
+    closeSheets();openSheet('sheetSettings');highlightGroqKey();
+    showNotice('Groq API Key လိုပါတယ် — Settings မှာ အရင် ထည့်ပါ','err');return}
+  let blob=null;
+  if(wfSrc()==='project'){blob=await idb.get('audio:'+state.id).catch(()=>null);
+    if(!blob){$('wfSrcErr').textContent='Project မှာ အသံ မရှိသေးပါ — အသံဖိုင် အရင် တင်ပါ (သို့) "ဖိုင် ရွေးမယ်" နည်း သုံးပါ။';$('wfSrcErr').classList.add('show');
+      wfSetStatus(1,'err','Project အသံ မရှိပါ — အသံဖိုင် အရင် တင်ပါ');
+      showNotice('Project အသံ မရှိပါ — အသံဖိုင် အရင် တင်ပါ','err');return}}
+  else{if(!wfFile){$('wfSrcErr').textContent='အသံဖိုင် အရင် ရွေးပါ — "📁 အသံဖိုင် ရွေးမယ်" ကို နှိပ်ပါ။';$('wfSrcErr').classList.add('show');
+      wfSetStatus(1,'err','အသံဖိုင် မရွေးရသေးပါ');
+      showNotice('အသံဖိုင် အရင် ရွေးပါ','err');return}
+    blob=wfFile}
+  $('wfSrcErr').classList.remove('show');
+  const route=wfSttRoute(wfLang());
+  wfAbort=('AbortController' in window)?new AbortController():null;
+  const signal=wfAbort?wfAbort.signal:undefined;
+  wfBusy(1,true);wfSetProg(1,'');
+  wfSetStatus(1,'work','စာသား ဖော်နေသည်');
+  /* cvMakeSttChunks reports chunk progress via setLoadMsg (the load pop-up's
+     line) — mirror it into this step's progress line while the step runs. */
+  const prevSetLoadMsg=setLoadMsg;
+  setLoadMsg=m=>{prevSetLoadMsg(m);wfSetProg(1,m)};
+  let err=null,en='';
+  try{
+    const pieces=await cvMakeSttChunks(blob,signal);
+    const texts=[];
+    for(let i=0;i<pieces.length;i++){
+      if(signal&&signal.aborted)throw cancelErr();
+      wfSetProg(1,'စာဖော်နေသည် '+(i+1)+' / '+pieces.length);
+      const r=await groqTranscribeEx(gk,pieces[i].blob,pieces[i].name,route,signal);
+      texts.push(r.text);
+      if(r.language)wfSetProg(1,'စာဖော်နေသည် '+(i+1)+' / '+pieces.length+' · မူရင်း ဘာသာ: '+r.language)}
+    en=texts.join(' ').trim();
+    if(!en)throw new Error('စာသား ဖော်၍ မရပါ — အသံ ရှင်းရှင်း ဖိုင် ပြောင်းသုံးကြည့်ပါ');
+  }catch(e){err=e}
+  setLoadMsg=prevSetLoadMsg;
+  wfAbort=null;wfBusy(1,false);wfSetProg(1,'');
+  if(err){if(err.cancelled||err.name==='AbortError')wfSetStatus(1,'wait','ရပ်လိုက်ပြီ — ပြန်စလို့ ရသည်');
+    else wfSetStatus(1,'err','မအောင်မြင်ပါ — '+(err.message||err));return}
+  $('wfEnText').value=en;$('wfEnCount').textContent=en.length;
+  if(wfSnapEn&&en!==wfSnapEn)wfSetStatus(2,'wait','English စာသား အသစ် ရပြီ — ပြန် ဘာသာပြန်ပါ');
+  wfSetStatus(1,'done','English စာသား ရပါပြီ ('+en.length+' လုံး) — စစ်ဆေး ပြင်ဆင်ပြီး "နောက် အဆင့်" နှိပ်ပါ');
+  showNotice('✅ အဆင့် ၁ ပြီးပါပြီ — English စာသား ရပါပြီ','ok')});
+/* --- step 2: Gemini translation (key rotation via geminiCall) --- */
+function isGModelMissing(e){return !!e&&(e.status===404||/not.?found/i.test(e.message||''))}
+async function geminiTextOnce(key,model,text,signal){
+  const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',
+    {method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},
+     body:JSON.stringify(wfGeminiTranslateBody(text)),signal});
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok){const e=new Error((data.error&&data.error.message)||('Google error '+res.status));
+    e.status=res.status;throw e}
+  const parts=(((data.candidates||[])[0]||{}).content||{}).parts||[];
+  const out=parts.map(p=>p.text||'').join('').trim();
+  if(!out)throw new Error('ဘာသာပြန် ပြန်မရပါ — ထပ်ကြိုးစားပါ');
+  return out}
+async function geminiTranslateChunk(key,text,signal){
+  if(wfJobGModel)return geminiTextOnce(key,wfJobGModel,text,signal);
+  const order=wfGeminiModelOrder();let lastErr=null;
+  for(const m of order){
+    try{const out=await geminiTextOnce(key,m,text,signal);
+      wfJobGModel=m;try{localStorage.setItem(LS_WF_GMODEL,m)}catch(e){}
+      return out}
+    catch(e){lastErr=e;if(!isGModelMissing(e))throw e}}
+  throw lastErr}
+async function geminiTranslateEn2My(text,signal,onPart){
+  wfJobGModel=null;
+  const chunks=splitLongText(text,3000);const outs=[];
+  for(let i=0;i<chunks.length;i++){
+    if(signal&&signal.aborted)throw cancelErr();
+    if(onPart)onPart(i+1,chunks.length);
+    outs.push(await geminiCall(k=>geminiTranslateChunk(k,chunks[i],signal)))}
+  return outs.join('\n')}
+$('btnWfTranslate').addEventListener('click',async()=>{
+  const en=$('wfEnText').value.trim();
+  if(!en){wfSetStatus(2,'err','English စာသား မရှိပါ — အဆင့် ၁ အရင် လုပ်ပါ');
+    showNotice('English စာသား မရှိပါ — အဆင့် ၁ သို့ ပြန်သွားပါ','err');return}
+  if(!geminiKeyList().length){wfSetStatus(2,'err','Gemini API Key မရှိပါ — Settings မှာ ထည့်ပါ');
+    closeSheets();openSheet('sheetSettings');highlightGeminiKey();
+    showNotice('Gemini API Key လိုပါတယ် — Settings မှာ အရင် ထည့်ပါ','err');return}
+  wfAbort=('AbortController' in window)?new AbortController():null;
+  const signal=wfAbort?wfAbort.signal:undefined;
+  wfBusy(2,true);wfSetProg(2,'');
+  wfSetStatus(2,'work','Gemini ဖြင့် မြန်မာ ဘာသာပြန်နေသည်');
+  let err=null,out='';
+  try{out=await geminiTranslateEn2My(en,signal,(i,n)=>wfSetProg(2,'ဘာသာပြန်နေသည် '+i+' / '+n))}
+  catch(e){err=e}
+  wfAbort=null;wfBusy(2,false);wfSetProg(2,'');
+  if(err){if(err.cancelled||err.name==='AbortError')wfSetStatus(2,'wait','ရပ်လိုက်ပြီ — ပြန်စလို့ ရသည်');
+    else wfSetStatus(2,'err','မအောင်မြင်ပါ — '+(err.message||err));return}
+  $('wfMyText').value=out;$('wfMyCount').textContent=out.length;
+  if(wfSnapMy&&out!==wfSnapMy)wfSetStatus(3,'wait','မြန်မာ စာသား အသစ် ရပြီ — အသံ ပြန်ထုတ်ပါ');
+  wfSnapEn=en;
+  wfSetStatus(2,'done','မြန်မာ စာသား ရပါပြီ ('+out.length+' လုံး) — စစ်ဆေး ပြင်ဆင်ပြီး "နောက် အဆင့်" နှိပ်ပါ');
+  showNotice('✅ အဆင့် ၂ ပြီးပါပြီ — မြန်မာ စာသား ရပါပြီ','ok')});
+/* --- step 3: voice via the narration engines' core calls --- */
+document.querySelectorAll('#wfEngChips .chip').forEach(ch=>ch.addEventListener('click',()=>{
+  document.querySelectorAll('#wfEngChips .chip').forEach(x=>x.classList.remove('on'));ch.classList.add('on');
+  const edge=wfEng().indexOf('edge')===0;
+  $('wfVoiceRow').classList.toggle('hidden',edge);
+  $('wfEdgeNote').style.display=edge?'':'none'}));
+$('wfVoiceBtn').addEventListener('click',()=>{voiceReturnSheet='sheetWorkflow'});
+async function wfGenGemini(text,style){
+  const chunks=splitTtsText(text,550);const pcms=[];let sr=24000;
+  for(let i=0;i<chunks.length;i++){if(wfGenCancel)break;
+    wfSetProg(3,'အပိုင်း '+(i+1)+' / '+chunks.length+' — အသံ: '+ttsVoice);
+    const r=await geminiCall(k=>geminiTtsChunk(k,(style?('['+style+'] '):'')+chunks[i],ttsVoice));
+    sr=r.rate;pcms.push(r.bytes);
+    if(i<chunks.length-1)await new Promise(r2=>setTimeout(r2,200))}
+  if(wfGenCancel||!pcms.length)return null;
+  const total=pcms.reduce((a,b)=>a+b.length,0);const all=new Uint8Array(total);let off=0;
+  pcms.forEach(b=>{all.set(b,off);off+=b.length});
+  return pcmToWav(all,sr)}
+async function wfGenEdge(text,voiceId,signal){
+  const token=await edgeAccessToken();
+  if(!token){const e=new Error('Edge အသံ သုံးရန် Login လိုပါတယ် — Settings ထိပ်ဆုံး အကောင့် အပိုင်းမှာ ဝင်ပါ');
+    e.needLogin=true;throw e}
+  const chunks=splitTtsText(text,550);const blobs=[];
+  for(let i=0;i<chunks.length;i++){
+    if(signal&&signal.aborted)throw cancelErr();
+    wfSetProg(3,'Edge အပိုင်း '+(i+1)+' / '+chunks.length);
+    const res=await fetch(PUBLIC_API+'/api/pub/synthesize',
+      {method:'POST',signal:signal,
+       headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+       body:JSON.stringify({text:chunks[i],voice:voiceId,rate:'+0%',pitch:'+0Hz'})});
+    if(res.status===401){const e=new Error('Login သက်တမ်း ကုန်သွားပါပြီ — Settings မှာ ပြန် ဝင်ပေးပါ');
+      e.needLogin=true;throw e}
+    if(!res.ok){const d=await res.json().catch(()=>({}));
+      throw new Error(d.detail||d.message||('Server error '+res.status))}
+    blobs.push(await res.blob())}
+  const ACx=window.AudioContext||window.webkitAudioContext;if(!ACx)throw new Error('WebAudio မရပါ');
+  const dac=new ACx();const bufs=[];
+  for(const b of blobs)bufs.push(await dac.decodeAudioData(await b.arrayBuffer()));
+  if(dac.close)dac.close();
+  return buffersToWav(bufs)}
+$('btnWfGen').addEventListener('click',async()=>{
+  const text=$('wfMyText').value.trim();
+  if(!text){wfSetStatus(3,'err','မြန်မာ စာသား မရှိပါ — အဆင့် ၂ အရင် လုပ်ပါ');
+    showNotice('မြန်မာ စာသား မရှိပါ — အဆင့် ၂ သို့ ပြန်သွားပါ','err');return}
+  const eng=wfEng();
+  if(eng==='gemini'&&!geminiKeyList().length){
+    wfSetStatus(3,'err','Gemini API Key မရှိပါ — Settings မှာ ထည့်ပါ');
+    closeSheets();openSheet('sheetSettings');highlightGeminiKey();
+    showNotice('Gemini API Key လိုပါတယ် — Settings မှာ အရင် ထည့်ပါ','err');return}
+  wfGenCancel=false;
+  wfAbort=('AbortController' in window)?new AbortController():null;
+  const signal=wfAbort?wfAbort.signal:undefined;
+  wfBusy(3,true);wfSetProg(3,'');
+  wfSetStatus(3,'work','အသံ ထုတ်နေသည်');
+  let err=null,wav=null;
+  try{
+    if(eng==='gemini')wav=await wfGenGemini(text,$('ttsStyle').value.trim());
+    else wav=await wfGenEdge(text,eng==='edge-thiha'?'my-MM-ThihaNeural':'my-MM-NilarNeural',signal);
+  }catch(e){err=e}
+  wfAbort=null;wfBusy(3,false);wfSetProg(3,'');
+  if(err){
+    if(err.needLogin){wfSetStatus(3,'err',err.message);
+      closeSheets();openSheet('sheetSettings');
+      try{$('acctBox').scrollIntoView({block:'start'})}catch(e2){}
+      showNotice(err.message,'err');return}
+    if(err.cancelled||err.name==='AbortError')wfSetStatus(3,'wait','ရပ်လိုက်ပြီ — ပြန်စလို့ ရသည်');
+    else wfSetStatus(3,'err','မအောင်မြင်ပါ — '+(err.message||err));return}
+  if(wfGenCancel||!wav){wfSetStatus(3,'wait','ရပ်လိုက်ပြီ — ပြန်စလို့ ရသည်');return}
+  wfSnapMy=text;
+  await wfSetVoiceResult(wav);
+  wfSetStatus(3,'done','အသံ ရပါပြီ — နားထောင်/ဒေါင်းလုဒ် လုပ်နိုင်ပြီး Project အသံ အဖြစ် သုံးနိုင်ပါပြီ');
+  showDone('✅ အသံ ရပါပြီ','Workflow ပြီးပါပြီ — အသံကို အောက်မှာ နားထောင်နိုင်ပြီး "Project အသံ အဖြစ် သုံးမယ်" ဖြင့် Video ဆက်ထုတ်နိုင်ပါတယ်')});
+/* --- step 3 result: custom mini waveform player + download + use-as-project --- */
+async function wfComputePeaks(blob){try{
+  const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return[];
+  const ac=new AC();const dec=await ac.decodeAudioData((await blob.arrayBuffer()).slice(0));
+  const ch=dec.getChannelData(0);const N=120;const step=Math.max(1,Math.floor(ch.length/N));const out=[];
+  for(let i=0;i<N;i++){let m=0;for(let j=0;j<step;j+=Math.ceil(step/40)){const v=Math.abs(ch[i*step+j]||0);if(v>m)m=v}out.push(m)}
+  if(ac.close)ac.close();return out}catch(e){return[]}}
+function wfDrawWave(){const c=$('wfWave');if(!c)return;const ctx=c.getContext&&c.getContext('2d');if(!ctx)return;
+  const a=$('wfAudioEl');
+  const dpr=window.devicePixelRatio||1;const W=Math.max(60,c.clientWidth||260),H=44;
+  if(c.width!==W*dpr){c.width=W*dpr;c.height=H*dpr}
+  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
+  const N=wfPeaks.length||64;const bw=W/N;const dur=a.duration||0;
+  const prog=dur?a.currentTime/dur:0;
+  for(let i=0;i<N;i++){const p=wfPeaks.length?wfPeaks[i]:0.18+0.12*Math.sin(i*0.7);
+    const h=Math.max(3,p*(H-6));const x=i*bw+bw*0.22,w=Math.max(1.4,bw*0.56);
+    ctx.fillStyle=(i/N<=prog)?'#eef2f8':'rgba(201,210,224,.38)';
+    ctx.beginPath();ctx.roundRect?ctx.roundRect(x,(H-h)/2,w,h,2):ctx.rect(x,(H-h)/2,w,h);ctx.fill()}}
+async function wfSetVoiceResult(blob){
+  wfVoiceBlob=blob;
+  if(wfVoiceUrl)URL.revokeObjectURL(wfVoiceUrl);
+  wfVoiceUrl=URL.createObjectURL(blob);
+  $('wfAudioEl').src=wfVoiceUrl;
+  $('wfResult').classList.remove('hidden');
+  wfPeaks=await wfComputePeaks(blob);wfDrawWave()}
+$('btnWfPlay').addEventListener('click',async()=>{const a=$('wfAudioEl');
+  if(!wfVoiceUrl){showNotice('အသံ အရင် ထုတ်ပါ','err');return}
+  if(a.paused){try{await a.play()}catch(e){showNotice('Play မရပါ — '+e.message,'err')}}else a.pause()});
+$('wfAudioEl').addEventListener('play',()=>{$('btnWfPlay').textContent='❚❚'});
+$('wfAudioEl').addEventListener('pause',()=>{$('btnWfPlay').textContent='▶'});
+$('wfAudioEl').addEventListener('ended',()=>{$('btnWfPlay').textContent='▶';wfDrawWave()});
+$('wfAudioEl').addEventListener('loadedmetadata',()=>{$('wfTDur').textContent=fmtT($('wfAudioEl').duration||0);wfDrawWave()});
+$('wfAudioEl').addEventListener('timeupdate',()=>{$('wfTCur').textContent=fmtT($('wfAudioEl').currentTime);wfDrawWave()});
+$('wfWave').addEventListener('click',e=>{const a=$('wfAudioEl');if(!a.duration)return;
+  const r=e.currentTarget.getBoundingClientRect();
+  a.currentTime=clamp((e.clientX-r.left)/r.width,0,1)*a.duration});
+$('btnWfDl').addEventListener('click',()=>{if(!wfVoiceUrl)return;
+  const a=document.createElement('a');a.href=wfVoiceUrl;
+  a.download=(fileBase()||'BurmeseVoice')+'.wav';a.click()});
+$('btnWfUse').addEventListener('click',async()=>{
+  if(!wfVoiceBlob){showNotice('အသံ အရင် ထုတ်ပါ — အဆင့် ၃ မှာ ထုတ်ပါ','err');return}
+  const nm=(fileBase()||'Narration')+'.wav';
+  await opBusy('Project အသံ အဖြစ် သတ်မှတ်နေပါတယ်…',async()=>{
+    await idb.put('audio:'+state.id,wfVoiceBlob);await setAudioBlob(wfVoiceBlob,nm)});
+  showDone('✅ အသံ ရပါပြီ','Project ၏ အသံ အဖြစ် သတ်မှတ်ပြီးပါပြီ — Export ဖြင့် Video ဆက်ထုတ်နိုင်ပါတယ်')});
+
 /* ============ init ============ */
 function refreshAll(){refreshTypoUI();
   $('audioName').textContent=state.audioName||'အသံဖိုင် မရွေးရသေးပါ';
@@ -2065,6 +2515,7 @@ window.ABS={get state(){return state},openSheet,closeSheets,renderThumb,renderLi
   get jobs(){return jobs},els:{preview:$('preview'),thumb:$('thumbPreview'),wave:$('wave')},
   geminiKeyList,geminiKeySlots,geminiCall,narrEngine,cvSource,cvLang,shrinkFormat,
   splitTtsText,splitLongText,pollinationsUrl,groqTranscribe,groqTranslate,
+  wfSttRoute,groqTranscribeEx,wfGeminiModelOrder,wfGeminiTranslateBody,geminiTranslateEn2My,wfGo,
   isMp4Family,shrinkRoute,cvSegRoute,segPlan,segProgressText,concatBlobs,cvBeginJob,
   shrinkSegNotice,decodeFailMsg,mp4Available,mp4ProbeDuration,SEG_WIN_SEC,
   get session(){return sbSession},set session(v){sbSession=v}};
