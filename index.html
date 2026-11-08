@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a0b0d">
 <title>Audiobook Studio</title>
+<!-- build: 2026-11-08 · shrinker single-pass pipeline (one 24 kHz decode context, one encoder, decode-ahead) · action buttons full-width centred -->
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -73,7 +74,7 @@ canvas#wave{flex:1;height:44px;min-width:0;cursor:pointer}
 .speedbtn{padding:8px 10px;border-radius:10px;font-size:12.5px;font-weight:700;color:var(--accent2);
   background:rgba(201,210,224,.10);border:1px solid var(--glassline)}
 .rowbtns{display:grid;grid-template-columns:1fr 1fr;gap:9px}
-.btn{display:flex;align-items:center;justify-content:center;gap:7px;padding:12px 10px;border-radius:13px;font-size:13.5px;font-weight:700;
+.btn{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;padding:12px 10px;border-radius:13px;font-size:13.5px;font-weight:700;
   background:rgba(201,210,224,.09);border:1px solid var(--glassline);color:var(--txt);text-align:center;line-height:1.25}
 .btn:active{transform:scale(.98)}
 .btn.primary{background:linear-gradient(145deg,var(--accent2),var(--accent));color:#12151b;border:none}
@@ -1546,6 +1547,32 @@ async function decodeRenderMono(blob,sr){
   const s=off.createBufferSource();s.buffer=buf;s.connect(off.destination);s.start();
   const pcm=await off.startRendering();
   return pcm.getChannelData(0)}
+/* Shrinker fast decode: ONE AudioContext pinned at SHRINK_SR for the whole
+   job. decodeAudioData then returns 24 kHz buffers directly, so the old
+   per-chunk OfflineAudioContext resample/render pass disappears entirely;
+   the stereo→mono downmix is a plain JS loop (far cheaper than a render
+   pass). Falls back to decodeRenderMono if a 24 kHz context is refused
+   or the segment has more than 2 channels. */
+let shrinkAC=null,shrinkAC24=false;
+function getShrinkAC(){
+  if(shrinkAC)return shrinkAC;
+  const ACx=window.AudioContext||window.webkitAudioContext;
+  if(!ACx)return null;
+  try{shrinkAC=new ACx({sampleRate:SHRINK_SR});shrinkAC24=(shrinkAC.sampleRate===SHRINK_SR)}
+  catch(e){try{shrinkAC=new ACx()}catch(e2){shrinkAC=null}}
+  return shrinkAC}
+async function decodeSegMono24(blob){
+  const ac=getShrinkAC();
+  if(!ac||!shrinkAC24)return decodeRenderMono(blob,SHRINK_SR);
+  if(ac.state==='suspended'){try{await ac.resume()}catch(e){}}
+  const buf=await ac.decodeAudioData(await blob.arrayBuffer());
+  const nc=buf.numberOfChannels;
+  if(nc===1)return buf.getChannelData(0);
+  if(nc!==2)return decodeRenderMono(blob,SHRINK_SR);
+  const L=buf.getChannelData(0),R=buf.getChannelData(1),n=buf.length;
+  const out=new Float32Array(n);
+  for(let i=0;i<n;i++)out[i]=(L[i]+R[i])*0.5;
+  return out}
 
 /* ============ Audio shrinker — ≤19 MB, for sending to the Telegram bot ============ */
 const SHRINK_SR=24000;
@@ -1640,17 +1667,25 @@ async function loadLame(){if(lameLib)return lameLib;
       }catch(e){/* broken or unreachable build — try the next CDN */}}
     throw mp3EncErr()})();
   try{return await lameLoading}catch(e){lameLoading=null;throw e}}
-/* Generic mono MP3 encode from Float32 PCM (lamejs) — shared by the
-   shrinker and the converter's STT chunker. */
-async function encodeMp3Mono(ch,sr,kb,isCancel,onProg){const L=await loadLame();
-  try{
-  const enc=new L.Mp3Encoder(1,sr,kb);const parts=[];const BLK=1152;
+/* Feed mono Float32 PCM into an EXISTING lame encoder and return the MP3
+   parts produced (no flush — the caller owns the encoder lifecycle).
+   Extracted from encodeMp3Mono so the shrinker can keep ONE encoder for
+   a whole segmented file instead of creating + flushing one per chunk. */
+function lameFeed(enc,ch,isCancel,onFrac){
+  const parts=[];const BLK=1152;
   for(let off=0;off<ch.length;off+=BLK){
     if(isCancel&&isCancel())throw cancelErr();
     const n=Math.min(BLK,ch.length-off);const i16=new Int16Array(n);
     for(let i=0;i<n;i++){const v=Math.max(-1,Math.min(1,ch[off+i]));i16[i]=v<0?v*0x8000:v*0x7FFF}
     const d=enc.encodeBuffer(i16);if(d&&d.length)parts.push(d);
-    if(onProg&&off%(BLK*512)===0)onProg(off/ch.length)}
+    if(onFrac&&off%(BLK*512)===0)onFrac(off/ch.length)}
+  return parts}
+/* Generic mono MP3 encode from Float32 PCM (lamejs) — shared by the
+   shrinker and the converter's STT chunker. */
+async function encodeMp3Mono(ch,sr,kb,isCancel,onProg){const L=await loadLame();
+  try{
+  const enc=new L.Mp3Encoder(1,sr,kb);
+  const parts=lameFeed(enc,ch,isCancel,onProg);
   const end=enc.flush();if(end&&end.length)parts.push(end);
   return new Blob(parts,{type:'audio/mpeg'})
   }catch(e){if(e&&e.cancelled)throw e;
@@ -1658,23 +1693,55 @@ async function encodeMp3Mono(ch,sr,kb,isCancel,onProg){const L=await loadLame();
     throw e}}
 async function encodeShrinkMp3(ch,kb){return encodeMp3Mono(ch,SHRINK_SR,kb,()=>shrinkCancel,
   p=>setLoadMsg('Encode (MP3) — '+Math.round(p*100)+'%'))}
-/* Long MP4-family sources: shrink segment by segment (bounded memory).
-   The bitrate for the ≤19 MB target is picked up front from the SOURCE
-   duration — the same estimate math as the whole-file path. Output is
-   always MP3 here (segment-wise WebM muxing is not attempted). */
+/* Long MP4-family sources: shrink in ONE continuous pass (memory stays
+   bounded — mp4box still windows the container into ~5-min media
+   segments and nothing is ever decoded whole). Everything downstream is
+   now single-pass, fixing the old flow that ran decode → offline
+   resample → encode strictly one-after-another per chunk with a fresh
+   AudioContext AND a fresh encoder for every chunk:
+   - one shared 24 kHz decode context (decodeSegMono24 — no render pass);
+   - ONE lame encoder for the whole file, flushed once at the very end;
+   - decode-ahead: the NEXT window decodes on the browser's media
+     threads while the current window encodes on the main thread.
+   Progress is continuous and honest: media-seconds encoded / total
+   duration as a %, plus chunk count and elapsed time. The bitrate for
+   the ≤19 MB target is picked up front from the SOURCE duration — the
+   same estimate math as the whole-file path. Output is always MP3 here
+   (segment-wise WebM muxing is not attempted). */
 async function shrinkSegmented(dur){
   const kb=pickShrinkBitrate(dur);
   shrinkDur=dur;refreshShrinkUI();
-  const parts=[];
+  const L=await loadLame();
+  const enc=new L.Mp3Encoder(1,SHRINK_SR,kb);
+  const parts=[];const t0=Date.now();
+  let totalWin=0,doneSec=0,curWin=1;
+  const prog=frac=>{
+    const mediaFrac=dur>0?Math.min(1,(doneSec+(frac||0)*SEG_WIN_SEC)/dur):0;
+    const el=Math.round((Date.now()-t0)/1000);
+    setLoadMsg('ချုံ့နေသည်… '+Math.round(mediaFrac*100)+'% · '+segProgressText(curWin,Math.max(totalWin,curWin))+' · ကြာချိန် '+el+' စက္ကန့် ('+kb+' kbps · mono · MP3)')};
+  const encodePcm=pcm=>{
+    const ps=lameFeed(enc,pcm,()=>shrinkCancel,f=>prog(f));
+    for(const p of ps)parts.push(p);
+    doneSec+=pcm.length/SHRINK_SR;curWin++;prog(0)};
+  let pending=null; /* decode of the newest window, running ahead */
   await mp4Segmented(shrinkFile,SEG_WIN_SEC,{
     isCancel:()=>shrinkCancel,
+    onMeta:(d,total)=>{totalWin=total;
+      if(d>0&&Math.abs(d-dur)>1){dur=d;shrinkDur=d;refreshShrinkUI()}},
     onWindow:async(i,total,segBlob)=>{
-      setLoadMsg(segProgressText(i+1,total)+' — ချုံ့နေသည်… ('+kb+' kbps · mono · MP3)');
-      const pcm=await decodeRenderMono(segBlob,SHRINK_SR);
-      if(shrinkCancel)throw cancelErr();
-      const mp3=await encodeMp3Mono(pcm,SHRINK_SR,kb,()=>shrinkCancel,null);
-      parts.push(mp3)}});
+      totalWin=Math.max(totalWin,total);
+      const promise=decodeSegMono24(segBlob);
+      promise.catch(()=>{}); /* a failure is re-thrown where it is awaited */
+      const prev=pending;pending={promise};
+      if(prev){const pcm=await prev.promise;
+        if(shrinkCancel)throw cancelErr();
+        encodePcm(pcm)}
+      else prog(0)}});
   if(shrinkCancel)throw cancelErr();
+  if(pending){const pcm=await pending.promise;pending=null;
+    if(shrinkCancel)throw cancelErr();
+    encodePcm(pcm)}
+  const end=enc.flush();if(end&&end.length)parts.push(end);
   if(!parts.length)throw new Error('အပိုင်းများ ထုတ် မရပါ — ဖိုင် စစ်ကြည့်ပါ');
   return {blob:concatBlobs(parts,'audio/mpeg'),ext:'mp3',kb,segmented:true}}
 document.querySelectorAll('#shrinkFmtChips .chip').forEach(ch=>ch.addEventListener('click',()=>{
