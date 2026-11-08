@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a0b0d">
 <title>Audiobook Studio</title>
-<!-- build: 2026-11-08 · shrinker single-pass pipeline (one 24 kHz decode context, one encoder, decode-ahead) · action buttons full-width centred -->
+<!-- build: 2026-11-09 · fast-export fix (interleaved A/V encode, cached static layer, half-res background, honest progress + elapsed, 8192-sample audio chunks, queue buttons full-width) · 2026-11-08 shrinker single-pass pipeline · action buttons full-width centred -->
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -131,6 +131,7 @@ canvas#thumbPreview{width:100%;aspect-ratio:16/9;display:block;border-radius:12p
 .jobitem .acts{display:flex;gap:7px;margin-top:9px}
 .jobbtn{flex:0 0 auto;padding:6px 12px;border-radius:9px;border:1px solid var(--glassline);background:rgba(201,210,224,.10);color:var(--txt);font:inherit;font-size:12.5px;font-weight:700;cursor:pointer}
 .jobbtn:active{transform:scale(.97)}
+.jobitem .acts .jobbtn{flex:1}
 #btnCancelExport{margin-top:14px}
 .voicerow{justify-content:space-between;text-align:left}
 .voicerow .vdesc{color:var(--mut);font-size:12px;font-weight:400}
@@ -855,8 +856,11 @@ function buildThemeGrid(){const grid=$('themeGrid');grid.innerHTML='';
     grid.appendChild(b)})}
 
 /* ============ preview renderer (also used for export) ============ */
-function drawFrame(ctx,w,h,tSec,peaks,progT){
-  paintBackground(ctx,w,h,tSec);
+/* Static foreground layer of a frame: gradient shade + card + cover +
+   titles. Nothing in here depends on time, so the fast exporter paints
+   it ONCE onto an offscreen canvas and blits it per frame; the preview
+   and the real-time exporter compose it fresh via drawFrame below. */
+function drawFrameForeground(ctx,w,h){
   const S=w/1920; /* scale unit vs 1920x1080 */
   const grad=ctx.createLinearGradient(0,h*0.45,0,h);grad.addColorStop(0,'rgba(4,5,7,0)');grad.addColorStop(1,'rgba(4,5,7,0.55)');
   ctx.fillStyle=grad;ctx.fillRect(0,0,w,h);
@@ -883,8 +887,9 @@ function drawFrame(ctx,w,h,tSec,peaks,progT){
     ctx.fillStyle=hexA(state.textColor,0.88);ty+=subPx*1.15;fitFillText(ctx,state.subtitle,tx,ty,tw);ty+=subPx*0.2}
   if(state.author){const aPx=state.subSize*0.82*(w/960);ctx.font='400 '+aPx+'px Padauk, sans-serif';
     ctx.fillStyle='rgba(238,242,248,0.75)';ty+=aPx*1.5;fitFillText(ctx,state.author,tx,ty,tw)}
-  ctx.restore();
-  /* waveform strip + progress */
+  ctx.restore()}
+/* Animated part of a frame: waveform strip + progress + time text. */
+function drawWaveStrip(ctx,w,h,tSec,peaks,progT){
   const wy=h*0.865,wh=h*0.075;const N=(peaks&&peaks.length)||64;const bw=w*0.86/N;
   const dur=audioEl.duration||state.audioDur||0;const curT=(typeof progT==='number')?progT:(audioEl.currentTime||0);const prog=dur?clamp(curT/dur,0,1):0;
   for(let i=0;i<N;i++){const p=peaks&&peaks.length?peaks[i]:0.2+0.14*Math.sin(i*0.6+tSec*2);
@@ -893,6 +898,10 @@ function drawFrame(ctx,w,h,tSec,peaks,progT){
     ctx.fillRect(x,wy+(wh-bh)/2,Math.max(1.4,bw*0.6),bh)}
   ctx.fillStyle='rgba(238,242,248,0.85)';ctx.font='400 '+(26*(w/960)*0.5+8)+'px Padauk, sans-serif';ctx.textAlign='right';
   ctx.fillText(fmtT(curT)+' / '+fmtT(dur),w*0.93,wy-10*(w/960)*0.5)}
+function drawFrame(ctx,w,h,tSec,peaks,progT){
+  paintBackground(ctx,w,h,tSec);
+  drawFrameForeground(ctx,w,h);
+  drawWaveStrip(ctx,w,h,tSec,peaks,progT)}
 function fitFillText(ctx,text,x,y,maxW){let s=text;if(ctx.measureText(s).width>maxW){while(s.length>1&&ctx.measureText(s+'…').width>maxW)s=s.slice(0,-1);s+='…'}ctx.fillText(s,x,y)}
 function hexA(hex,a){if(!hex||hex[0]!=='#'||hex.length<7)return hex;const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return 'rgba('+r+','+g+','+b+','+a+')'}
 const preview=$('preview');const pctx=preview.getContext&&preview.getContext('2d');
@@ -1072,69 +1081,121 @@ async function loadMuxer(){if(muxerMod)return muxerMod;
   if(!muxerMod||!muxerMod.Muxer||!muxerMod.ArrayBufferTarget)throw new Error('mp4-muxer မရပါ');
   return muxerMod}
 async function runFastExport(job){job.status='ပြင်ဆင်နေသည်… (Fast)';renderJobs();
-  const mod=await loadMuxer();
-  const blob=await idb.get('audio:'+job.snapshot.id).catch(()=>null);
-  if(!blob)throw new Error('အသံဖိုင် မတွေ့ပါ');
-  const ACx=window.AudioContext||window.webkitAudioContext;if(!ACx)throw new Error('WebAudio မရပါ');
-  const dac=new ACx({sampleRate:48000});
-  let buf;try{buf=await dac.decodeAudioData(await blob.arrayBuffer())}finally{if(dac.close)dac.close()}
-  const SR=buf.sampleRate,CH=2;
-  let vCfg=null;const vCands=['avc1.640033','avc1.640028','avc1.4d4028','avc1.42001f'];
-  for(const c of vCands){const cfg={codec:c,width:1920,height:1080,bitrate:8_000_000,framerate:30};
-    try{const s=await VideoEncoder.isConfigSupported(cfg);if(s&&s.supported){vCfg=s.config||cfg;break}}catch(e){}}
-  if(!vCfg)throw new Error('H.264 encoder မရပါ');
-  const aCfg={codec:'mp4a.40.2',sampleRate:SR,numberOfChannels:CH,bitrate:128_000};
-  const aSup=await AudioEncoder.isConfigSupported(aCfg).catch(()=>null);
-  if(!aSup||!aSup.supported)throw new Error('AAC encoder မရပါ');
-  const muxer=new mod.Muxer({target:new mod.ArrayBufferTarget(),
-    video:{codec:'avc',width:1920,height:1080},audio:{codec:'aac',sampleRate:SR,numberOfChannels:CH},
-    fastStart:'in-memory',firstTimestampBehavior:'offset'});
-  let encErr=null;
-  const vEnc=new VideoEncoder({output:(chunk,meta)=>muxer.addVideoChunk(chunk,meta),error:e=>{encErr=encErr||e}});
-  vEnc.configure(vCfg);
-  const aEnc=new AudioEncoder({output:(chunk,meta)=>muxer.addAudioChunk(chunk,meta),error:e=>{encErr=encErr||e}});
-  aEnc.configure(aSup.config||aCfg);
-  const ae={job,kind:'fast',cancelled:false,requestCancel:()=>{try{vEnc.close()}catch(e){}try{aEnc.close()}catch(e){}}};
-  const savedState=state;state=Object.assign(defaults(),job.snapshot);
-  activeExport=ae;RT.exporting=true;job.status='⚡ Fast Render လုပ်နေသည်…';renderJobs();
-  showLoad('⚡ Fast Video ထုတ်နေပါတယ်…','0% — "'+job.title+'"');
+  const t0=Date.now();const elSec=()=>Math.round((Date.now()-t0)/1000);
+  let phase='ပြင်ဆင်နေသည်…';
+  /* The popup is up from the very first await, with a 500 ms ticker that
+     keeps the phase + elapsed time moving through the prep work. The old
+     flow only showed the popup after the full-audio decode and only
+     updated progress inside the video loop, so it sat on "0%" for
+     minutes while real work (muxer download, whole-file decode, the
+     entire AAC encode) happened invisibly first. */
+  showLoad('⚡ Fast Video ထုတ်နေပါတယ်…',phase+' · ကြာချိန် 0 စက္ကန့် — "'+job.title+'"');
   $('btnCancelExport').classList.remove('hidden');
-  const cv=document.createElement('canvas');cv.width=1920;cv.height=1080;
-  const cx=cv.getContext&&cv.getContext('2d');
-  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+  const ae={job,kind:'fast',cancelled:false,requestCancel:null};
+  activeExport=ae;
+  const tick=setInterval(()=>{if(activeExport===ae&&!ae.cancelled)
+    setLoadMsg(phase+' · ကြာချိန် '+elSec()+' စက္ကန့် — "'+job.title+'"')},500);
+  let muxer=null,vEnc=null,aEnc=null;
   try{
-    if(!cx)throw new Error('Canvas မရပါ');
-    const ch0=buf.getChannelData(0),ch1=buf.numberOfChannels>1?buf.getChannelData(1):ch0;
-    const CPF=1024,totalSamples=ch0.length;
-    for(let off=0;off<totalSamples;off+=CPF){
+    const mod=await loadMuxer();if(ae.cancelled)throw cancelErr();
+    const blob=await idb.get('audio:'+job.snapshot.id).catch(()=>null);
+    if(!blob)throw new Error('အသံဖိုင် မတွေ့ပါ');
+    if(ae.cancelled)throw cancelErr();
+    const ACx=window.AudioContext||window.webkitAudioContext;if(!ACx)throw new Error('WebAudio မရပါ');
+    phase='အသံ ပြင်ဆင်နေသည်…';job.status='အသံ ပြင်ဆင်နေသည်… (Fast)';renderJobs();
+    const dac=new ACx({sampleRate:48000});
+    let buf;try{buf=await dac.decodeAudioData(await blob.arrayBuffer())}finally{if(dac.close)dac.close()}
+    if(ae.cancelled)throw cancelErr();
+    const SR=buf.sampleRate,CH=2;
+    let vCfg=null;const vCands=['avc1.640033','avc1.640028','avc1.4d4028','avc1.42001f'];
+    for(const c of vCands){const cfg={codec:c,width:1920,height:1080,bitrate:8_000_000,framerate:30};
+      try{const s=await VideoEncoder.isConfigSupported(cfg);if(s&&s.supported){vCfg=s.config||cfg;break}}catch(e){}}
+    if(!vCfg)throw new Error('H.264 encoder မရပါ');
+    const aCfg={codec:'mp4a.40.2',sampleRate:SR,numberOfChannels:CH,bitrate:128_000};
+    const aSup=await AudioEncoder.isConfigSupported(aCfg).catch(()=>null);
+    if(!aSup||!aSup.supported)throw new Error('AAC encoder မရပါ');
+    muxer=new mod.Muxer({target:new mod.ArrayBufferTarget(),
+      video:{codec:'avc',width:1920,height:1080},audio:{codec:'aac',sampleRate:SR,numberOfChannels:CH},
+      fastStart:'in-memory',firstTimestampBehavior:'offset'});
+    let encErr=null;
+    vEnc=new VideoEncoder({output:(chunk,meta)=>muxer.addVideoChunk(chunk,meta),error:e=>{encErr=encErr||e}});
+    vEnc.configure(vCfg);
+    aEnc=new AudioEncoder({output:(chunk,meta)=>muxer.addAudioChunk(chunk,meta),error:e=>{encErr=encErr||e}});
+    aEnc.configure(aSup.config||aCfg);
+    ae.requestCancel=()=>{try{vEnc.close()}catch(e){}try{aEnc.close()}catch(e){}};
+    const savedState=state;state=Object.assign(defaults(),job.snapshot);
+    RT.exporting=true;job.status='⚡ Fast Render လုပ်နေသည်…';renderJobs();
+    phase='⚡ Fast Render လုပ်နေသည်…';
+    const cv=document.createElement('canvas');cv.width=1920;cv.height=1080;
+    const cx=cv.getContext&&cv.getContext('2d');
+    /* Per-frame cost cut: the static foreground (card, cover, titles —
+       incl. the old per-line measureText truncation loops) is painted
+       ONCE to an offscreen layer, and the animated theme background is
+       painted at half resolution (soft gradients — the upscale is not
+       visible) and blitted. Each frame is then: half-res theme paint +
+       two drawImage blits + the waveform strip. */
+    const fg=document.createElement('canvas');fg.width=1920;fg.height=1080;
+    const fx=fg.getContext&&fg.getContext('2d');
+    const bgS=document.createElement('canvas');bgS.width=960;bgS.height=540;
+    const bx=bgS.getContext&&bgS.getContext('2d');
+    const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+    /* Unified honest progress: media-seconds encoded / total duration,
+       refreshed at most every 250 ms, always with elapsed seconds —
+       same pattern as the shrinker. */
+    const dur=buf.duration,totalSamples=buf.length;
+    let lastUi=0;
+    const prog=(mediaSec,force)=>{const now=Date.now();if(!force&&now-lastUi<250)return;lastUi=now;
+      const p=dur>0?clamp(mediaSec/dur,0,1):0;job.progress=p;
+      setLoadMsg(Math.round(p*100)+'% · ကြာချိန် '+elSec()+' စက္ကန့် — "'+job.title+'"');renderJobs()};
+    try{
+      if(!cx||!fx||!bx)throw new Error('Canvas မရပါ');
+      drawFrameForeground(fx,1920,1080);
+      const ch0=buf.getChannelData(0),ch1=buf.numberOfChannels>1?buf.getChannelData(1):ch0;
+      const CPF=8192;let aOff=0; /* samples fed to the AAC encoder so far */
+      const feedAudioUntil=async sampleEnd=>{
+        while(aOff<sampleEnd){
+          if(ae.cancelled)throw cancelErr();if(encErr)throw encErr;
+          while(aEnc.encodeQueueSize>24){await sleep(2);if(ae.cancelled)throw cancelErr();if(encErr)throw encErr}
+          const nf=Math.min(CPF,sampleEnd-aOff);
+          const data=new Float32Array(nf*CH);
+          data.set(ch0.subarray(aOff,aOff+nf),0);data.set(ch1.subarray(aOff,aOff+nf),nf);
+          const ad=new AudioData({format:'f32-planar',sampleRate:SR,numberOfFrames:nf,numberOfChannels:CH,
+            timestamp:Math.round(aOff/SR*1e6),data:data.buffer});
+          aEnc.encode(ad);ad.close();aOff+=nf}};
+      /* Audio and video are now INTERLEAVED — audio is fed just ahead
+         of the frame being encoded — instead of encoding the whole
+         audio track first. Progress therefore moves from the first
+         frame, and the two encoders' work overlaps. */
+      const fps=30,total=Math.max(1,Math.ceil(dur*fps));
+      const frameSamples=SR/fps;
+      clearInterval(tick); /* prog() owns the popup message from here */
+      for(let f=0;f<total;f++){
+        if(ae.cancelled)throw cancelErr();if(encErr)throw encErr;
+        await feedAudioUntil(Math.min(totalSamples,Math.round((f+1)*frameSamples)));
+        const t=f/fps;
+        paintBackground(bx,960,540,t);
+        cx.drawImage(bgS,0,0,1920,1080);
+        cx.drawImage(fg,0,0);
+        drawWaveStrip(cx,1920,1080,t,RT.peaks,t);
+        const vf=new VideoFrame(cv,{timestamp:Math.round(f*1e6/fps),duration:Math.round(1e6/fps)});
+        while(vEnc.encodeQueueSize>8){await sleep(4);if(ae.cancelled){vf.close();throw cancelErr()}if(encErr){vf.close();throw encErr}}
+        vEnc.encode(vf,{keyFrame:f%(fps*5)===0});vf.close();
+        prog(Math.min(dur,(f+1)/fps),f===total-1);
+        if(f%24===0)await sleep(0)}
+      await feedAudioUntil(totalSamples);
+      prog(dur,true);
+      await aEnc.flush();await vEnc.flush();
       if(ae.cancelled)throw cancelErr();if(encErr)throw encErr;
-      const nf=Math.min(CPF,totalSamples-off);
-      while(aEnc.encodeQueueSize>8){await sleep(4);if(ae.cancelled)throw cancelErr()}
-      const data=new Float32Array(nf*CH);
-      data.set(ch0.subarray(off,off+nf),0);data.set(ch1.subarray(off,off+nf),nf);
-      const ad=new AudioData({format:'f32-planar',sampleRate:SR,numberOfFrames:nf,numberOfChannels:CH,
-        timestamp:Math.round(off/SR*1e6),data:data.buffer});
-      aEnc.encode(ad);ad.close()}
-    await aEnc.flush();if(ae.cancelled)throw cancelErr();if(encErr)throw encErr;
-    const fps=30,dur=buf.duration,total=Math.max(1,Math.ceil(dur*fps));
-    for(let f=0;f<total;f++){
-      if(ae.cancelled)throw cancelErr();if(encErr)throw encErr;
-      const t=f/fps;drawFrame(cx,1920,1080,t,RT.peaks,t);
-      const vf=new VideoFrame(cv,{timestamp:Math.round(f*1e6/fps),duration:Math.round(1e6/fps)});
-      while(vEnc.encodeQueueSize>8){await sleep(4);if(ae.cancelled){vf.close();throw cancelErr()}}
-      vEnc.encode(vf,{keyFrame:f%(fps*5)===0});vf.close();
-      job.progress=(f+1)/total;
-      if(f%10===0){setLoadMsg(Math.round(job.progress*100)+'% — "'+job.title+'"');renderJobs()}
-      if(f%24===0)await sleep(0)}
-    await vEnc.flush();if(ae.cancelled)throw cancelErr();if(encErr)throw encErr;
-  }finally{try{vEnc.close()}catch(e){}try{aEnc.close()}catch(e){}
-    if(activeExport===ae)activeExport=null;
-    state=savedState;RT.exporting=false;hideLoad();refreshAll()}
-  muxer.finalize();
-  const outBlob=new Blob([muxer.target.buffer],{type:'video/mp4'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(outBlob);
-  a.download=job.title+'.mp4';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),6000);
-  state.videoExported=true;saveMeta()}
+    }finally{try{vEnc.close()}catch(e){}try{aEnc.close()}catch(e){}
+      if(activeExport===ae)activeExport=null;
+      state=savedState;RT.exporting=false;hideLoad();refreshAll()}
+    muxer.finalize();
+    const outBlob=new Blob([muxer.target.buffer],{type:'video/mp4'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(outBlob);
+    a.download=job.title+'.mp4';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),6000);
+    state.videoExported=true;saveMeta();
+  }catch(e){clearInterval(tick);if(activeExport===ae)activeExport=null;hideLoad();throw e}
+  finally{clearInterval(tick)}}
 
 async function runExportRT(job){job.status='ပြင်ဆင်နေသည်…';renderJobs();
   const cv=document.createElement('canvas');cv.width=1920;cv.height=1080;
@@ -1158,10 +1219,10 @@ async function runExportRT(job){job.status='ပြင်ဆင်နေသည်
   RT.exporting=true;job.status='🎬 Render လုပ်နေသည်…';renderJobs();
   showLoad('Video ထုတ်နေပါတယ်…','0% — "'+job.title+'"');
   $('btnCancelExport').classList.remove('hidden');
-  let rafId=null;
+  let rafId=null;const rtT0=Date.now();
   const drawLoop=()=>{const ct=audioEl.currentTime||0;drawFrame(cx,1920,1080,ct,RT.peaks,ct);
     const d=audioEl.duration||0;job.progress=d?clamp(ct/d,0,1):0;
-    if(Math.floor(job.progress*100)%2===0){setLoadMsg(Math.round(job.progress*100)+'% — "'+job.title+'"');renderJobs()}
+    if(Math.floor(job.progress*100)%2===0){setLoadMsg(Math.round(job.progress*100)+'% · ကြာချိန် '+Math.round((Date.now()-rtT0)/1000)+' စက္ကန့် — "'+job.title+'"');renderJobs()}
     rafId=requestAnimationFrame(drawLoop)};
   try{rec.start(250);await audioEl.play();drawLoop();
     await new Promise((res,rej)=>{rejectWait=rej;audioEl.addEventListener('ended',res,{once:true});
